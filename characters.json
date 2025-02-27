@@ -1,0 +1,47 @@
+{
+    "languages": {
+      "japanese": [
+        {
+          "word": "こんにちは",
+          "characters": ["こ", "ん", "に", "ち", "は"],
+          "translation": "Hello",
+          "pronunciation": "Kon'nichiwa"
+        },
+        {
+          "word": "ありがとう",
+          "characters": ["あ", "り", "が", "と", "う"],
+          "translation": "Thank you",
+          "pronunciation": "Arigatō"
+        }
+      ],
+      "chinese_simplified": [
+        {
+          "word": "你好",
+          "characters": ["你", "好"],
+          "translation": "Hello",
+          "pronunciation": "Nǐ hǎo"
+        },
+        {
+          "word": "谢谢",
+          "characters": ["谢", "谢"],
+          "translation": "Thanks",
+          "pronunciation": "Xièxiè"
+        }
+      ],
+      "chinese_traditional": [
+        {
+          "word": "你好",
+          "characters": ["你", "好"],
+          "translation": "Hello",
+          "pronunciation": "Nǐ hǎo"
+        },
+        {
+          "word": "謝謝",
+          "characters": ["謝", "謝"],
+          "translation": "Thanks",
+          "pronunciation": "Xièxiè"
+        }
+      ]
+    }
+  }
+  

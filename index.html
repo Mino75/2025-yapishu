@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>я пишу</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <script>
+    // Dynamically load Google Fonts only if the network is available
+    if (navigator.onLine) {
+      const fonts = [
+        "https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100..900&family=Sacramento&display=swap",
+        "https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@100..900&family=Sacramento&display=swap",
+        "https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@100..900&family=Sacramento&family=Yuji+Mai&display=swap"
+      ];
+      fonts.forEach(url => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = url;
+        document.head.appendChild(link);
+      });
+    }
+  </script>
+
+</head>
+<body>
+
+  <!-- Logo at the top -->
+  <header>
+
+  </header>
+
+  <!-- Loading overlay shown while data loads -->
+  <div id="loadingOverlay">
+    <p>Loading data...</p>
+  </div>
+  
+  <h1>я пишу</h1>
+  <div id="app"></div>
+  
+  <!-- Button to finish an exercise / show next character -->
+  <button id="finishExerciseButton" style="display:none;">Next Character</button>
+  <!-- Container to display translation, pronunciation, and exercise count -->
+  <div id="translationDisplay" style="font-size:20px; margin-top:10px;"></div>
+  
+  <!-- Canvas for drawing -->
+  <canvas id="canvas" width="500" height="500"></canvas>
+  
+  <!-- Inject styles and then the db and main scripts -->
+  <script src="style.js"></script>
+  <script src="db.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
