@@ -1,5 +1,23 @@
 // main.js
 
+
+// At the top or near your service worker registration code:
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').then(() => {
+    console.log('Service Worker Registered');
+  });
+
+  // Listen for messages from the Service Worker
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data.action === 'reload') {
+      console.log('New version available. Reloading...');
+      window.location.reload();
+    }
+  });
+}
+
+
+
 // Register Service Worker for offline support
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').then(() => {
@@ -296,3 +314,4 @@ function startTrainingExercise() {
     Exercises: ${currentCharacter.exercises}`;
   finishButton.style.display = 'inline-block';
 }
+

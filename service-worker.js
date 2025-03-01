@@ -19,8 +19,7 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
-  // Force the waiting service worker to become the active service worker.
-  self.skipWaiting();
+  self.skipWaiting(); // Force the new SW to skip waiting.
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
@@ -29,7 +28,6 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    // Delete all caches that aren't the current one.
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
@@ -38,10 +36,13 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
-    .then(() => {
-      // Claim clients immediately so that the new service worker controls them.
+    }).then(() => {
       return self.clients.claim();
+    }).then(() => {
+      // After taking control, notify clients to reload.
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ action: 'reload' }));
+      });
     })
   );
 });
@@ -54,10 +55,9 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
-        // Otherwise, try fetching from the network.
+        // Otherwise, attempt a network fetch.
         return fetch(event.request).catch(() => {
-          // If the request is a navigation request and the network fails,
-          // return the cached index.html.
+          // If the request is for navigation and network fails, return cached index.html.
           if (event.request.mode === 'navigate') {
             return caches.match('/index.html');
           }
