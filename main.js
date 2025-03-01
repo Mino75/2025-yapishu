@@ -16,8 +16,7 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 // For continuous drawing, store last point coordinates
-let lastX = 0,
-  lastY = 0;
+let lastX = 0, lastY = 0;
 
 // Create language select
 // The select option values will be "japanese" and "chinese_simplified"
@@ -26,7 +25,7 @@ const languages = ['Japanese', 'Chinese Simplified'];
 const languageSelect = document.createElement('select');
 languages.forEach(lang => {
   const option = document.createElement('option');
-  option.value = lang.toLowerCase().replace(' ', '_');
+  option.value = lang.toLowerCase().replace(' ', '_'); // e.g. "japanese", "chinese_simplified"
   option.textContent = lang;
   languageSelect.appendChild(option);
 });
@@ -55,6 +54,12 @@ startButton.textContent = 'Start Training';
 startButton.id = 'startButton';
 app.appendChild(startButton);
 
+// Create Reload Data button
+const reloadButton = document.createElement('button');
+reloadButton.textContent = 'Reload Data';
+reloadButton.id = 'reloadButton';
+app.appendChild(reloadButton);
+
 // Global variables
 let characterData = null;
 let selectedLanguage = languageSelect.value;
@@ -71,6 +76,11 @@ fontSelect.addEventListener('change', () => {
   }
 });
 
+// Reload Data button: clear old connection (if any) and fetch fresh data
+reloadButton.addEventListener('click', () => {
+  clearAndReloadData();
+});
+
 // Open the database and load data on startup
 dbFunctions.openDatabase(() => {
   dbFunctions.loadData(data => {
@@ -79,53 +89,76 @@ dbFunctions.openDatabase(() => {
       console.log('Data loaded from IndexedDB');
       finishLoading();
     } else {
-      // No stored data found, so fetch from server and transform before storing.
-      Promise.all([
-        fetch('japanese-jlpt.json').then(res => res.json()),
-        fetch('mandarin-simplified-hsk.json').then(res => res.json())
-      ])
-        .then(([japaneseData, chineseData]) => {
-          // Transform Japanese data
-          const transformedJapanese = japaneseData.map(item => ({
-            word: item.expression,
-            pronunciation: item.reading,
-            translation: item.meaning,
-            tags: item.tags,
-            number: null, // No numerotation for Japanese
-            exercises: 0,
-            failures: 0
-          }));
-          // Transform Chinese data
-          const transformedChinese = chineseData.map(item => ({
-            number: item.No, // store the numerotation from the "No" field
-            word: item.Chinese,
-            pronunciation: item.Pinyin,
-            translation: item.English,
-            level: item.Level,
-            exercises: 0,
-            failures: 0
-          }));
-
-          // Build the characterData object.
-          // The keys here ("japanese", "chinese_simplified") match the languageSelect option values.
-          characterData = {
-            japanese: transformedJapanese,
-            chinese_simplified: transformedChinese
-          };
-
-          // Save the transformed data to IndexedDB
-          dbFunctions.saveData(characterData, () => {
-            console.log('Data fetched from server and stored in IndexedDB');
-            finishLoading();
-          });
-        })
-        .catch(err => {
-          console.error('Error fetching data:', err);
-          loadingOverlay.textContent = 'Failed to load data.';
-        });
+      // No stored data found; fetch new data from server
+      fetchAndStoreData();
     }
   });
 });
+
+// Function to fetch new data from the server, transform it, and store it in IndexedDB
+function fetchAndStoreData() {
+  Promise.all([
+    fetch('japanese-jlpt.json').then(res => res.json()),
+    fetch('mandarin-simplified-hsk.json').then(res => res.json())
+  ])
+  .then(([japaneseData, chineseData]) => {
+    // Transform Japanese data
+    const transformedJapanese = japaneseData.map(item => ({
+      word: item.expression,
+      pronunciation: item.reading,
+      translation: item.meaning,
+      tags: item.tags,
+      number: null, // No numerotation for Japanese
+      exercises: 0,
+      failures: 0
+    }));
+    // Transform Chinese data
+    const transformedChinese = chineseData.map(item => ({
+      number: item.No, // store the numerotation from the "No" field
+      word: item.Chinese,
+      pronunciation: item.Pinyin,
+      translation: item.English,
+      level: item.Level,
+      exercises: 0,
+      failures: 0
+    }));
+    
+    // Build the characterData object.
+    // The keys ("japanese", "chinese_simplified") match the language select option values.
+    characterData = {
+      japanese: transformedJapanese,
+      chinese_simplified: transformedChinese
+    };
+    
+    // Save the new data to IndexedDB (this will overwrite any old data)
+    dbFunctions.saveData(characterData, () => {
+      console.log('New data stored in IndexedDB.');
+      finishLoading();
+    });
+  })
+  .catch(err => {
+    console.error('Error fetching new data:', err);
+    loadingOverlay.textContent = 'Failed to load new data.';
+  });
+}
+
+// Function to clear the existing IndexedDB data and reload fresh data.
+// This function ensures that we re-open the DB connection if it was closed.
+function clearAndReloadData() {
+  // Close the existing connection if it exists.
+  if (db) {
+    try {
+      db.close();
+    } catch (e) {
+      console.warn('Error closing DB:', e);
+    }
+    db = null;
+  }
+  // Open a new connection, then fetch fresh data.
+  dbFunctions.openDatabase(() => {
+    fetchAndStoreData();
+  });
+}
 
 // Hide loading overlay and initialize training functionality
 function finishLoading() {
@@ -136,7 +169,7 @@ function finishLoading() {
 // Set up training functionality
 function setupTraining() {
   startButton.addEventListener('click', () => {
-    // Get the selected language (e.g. "japanese" or "chinese_simplified")
+    // Use the selected language (e.g., "japanese" or "chinese_simplified")
     selectedLanguage = languageSelect.value;
     characterList = characterData[selectedLanguage];
     startTrainingExercise();
@@ -145,16 +178,9 @@ function setupTraining() {
   finishButton.addEventListener('click', () => {
     if (currentCharacter) {
       currentCharacter.exercises++;
-      dbFunctions.updateCharacter(
-        selectedLanguage,
-        currentCharacter,
-        characterData,
-        () => {
-          console.log(
-            `Updated "${currentCharacter.word}" count to ${currentCharacter.exercises}`
-          );
-        }
-      );
+      dbFunctions.updateCharacter(selectedLanguage, currentCharacter, characterData, () => {
+        console.log(`Updated "${currentCharacter.word}" count to ${currentCharacter.exercises}`);
+      });
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       translationDisplay.textContent = '';
       finishButton.style.display = 'none';
@@ -162,18 +188,16 @@ function setupTraining() {
     }
   });
 
-  // Continuous drawing on canvas using scaled coordinates
+  // Mouse drawing events
   canvas.addEventListener('mousedown', e => {
     drawing = true;
     const { x, y } = getCanvasCoordinates(e);
     lastX = x;
     lastY = y;
   });
-
   canvas.addEventListener('mouseup', () => {
     drawing = false;
   });
-
   canvas.addEventListener('mousemove', e => {
     if (!drawing) return;
     const { x, y } = getCanvasCoordinates(e);
@@ -187,8 +211,8 @@ function setupTraining() {
     lastX = x;
     lastY = y;
   });
-
-  // Touch events for mobile devices
+  
+  // Touch drawing events
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     drawing = true;
@@ -197,7 +221,6 @@ function setupTraining() {
     lastX = x;
     lastY = y;
   });
-
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     if (!drawing) return;
@@ -213,14 +236,13 @@ function setupTraining() {
     lastX = x;
     lastY = y;
   });
-
   canvas.addEventListener('touchend', e => {
     e.preventDefault();
     drawing = false;
   });
 }
 
-// Get scaled canvas coordinates from event
+// Helper function: get scaled canvas coordinates from an event
 function getCanvasCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
@@ -231,10 +253,9 @@ function getCanvasCoordinates(e) {
   };
 }
 
-// Helper: determine optimal font size so that text fits 80% of canvas width
+// Helper: determine optimal font size so that text fits 80% of the canvas width
 function getFittingFontSize(text, maxWidth, fontFamily) {
-  let min = 10,
-    max = 500;
+  let min = 10, max = 500;
   while (max - min > 1) {
     const mid = (min + max) / 2;
     ctx.font = `${mid}px ${fontFamily}`;
@@ -263,23 +284,15 @@ function drawModelText() {
   ctx.restore();
 }
 
-// Start a training exercise: choose a character (prioritizing those with lower exercise counts),
+// Start a training exercise: choose a character (prioritizing those with the fewest exercises),
 // display its guide text, translation, pronunciation, and exercise count.
 function startTrainingExercise() {
-  // Find the minimum exercise count in the current language
   const minExercises = Math.min(...characterList.map(c => c.exercises));
-  // Filter to those characters with that count
   const candidates = characterList.filter(c => c.exercises === minExercises);
-  // Choose randomly among them
   currentCharacter = candidates[Math.floor(Math.random() * candidates.length)];
-
-  // Draw the guide text
   drawModelText();
-
-  // Display translation, pronunciation, and exercise count
   translationDisplay.innerHTML = `Translation: ${currentCharacter.translation}<br>
     Pronunciation: ${currentCharacter.pronunciation || 'N/A'}<br>
     Exercises: ${currentCharacter.exercises}`;
-
   finishButton.style.display = 'inline-block';
 }
