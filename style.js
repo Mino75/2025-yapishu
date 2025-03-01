@@ -1,4 +1,3 @@
-// style.js
 const style = document.createElement('style');
 style.innerHTML = `
   /* Global dark mode styling */
@@ -82,12 +81,15 @@ style.innerHTML = `
     color: #331c4c;
   }
   
-  /* Canvas styling with white background and crosshair cursor */
+  /* Canvas styling */
+  /* Default on mobile: force full width */
   canvas {
     border: 3px solid #331c4c;
     margin-top: 1.5rem;
     background-color: #ffffff;
     cursor: crosshair;
+    width: 100%;
+    height: auto;
   }
   
   /* Translation display styling */
@@ -97,9 +99,9 @@ style.innerHTML = `
     color: #5de2f2;
   }
   
-  /* Responsive adjustments */
+  /* Responsive adjustments for larger screens */
   @media (min-width: 768px) {
-    /* Increase canvas size on desktop */
+    /* On desktop, force a fixed canvas size */
     canvas {
       width: 700px !important;
       height: 700px !important;
