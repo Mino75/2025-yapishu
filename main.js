@@ -1,13 +1,12 @@
 // main.js
 
-
-// At the top or near your service worker registration code:
+// ----------------------------
+// Service Worker Registration
+// ----------------------------
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').then(() => {
     console.log('Service Worker Registered');
   });
-
-  // Listen for messages from the Service Worker
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data.action === 'reload') {
       console.log('New version available. Reloading...');
@@ -16,40 +15,42 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-
-
-// Register Service Worker for offline support
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/service-worker.js').then(() => {
-    console.log('Service Worker Registered');
-  });
-}
-
-// Get references to DOM elements
+// ----------------------------
+// DOM ELEMENT REFERENCES
+// ----------------------------
 const loadingOverlay = document.getElementById('loadingOverlay');
 const finishButton = document.getElementById('finishExerciseButton');
+finishButton.textContent = '✅ Finish'; // Emoji prefix for Finish button
 const translationDisplay = document.getElementById('translationDisplay');
 const app = document.getElementById('app');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-// For continuous drawing, store last point coordinates
+// Coordinates for drawing
 let lastX = 0, lastY = 0;
 
-// Create language select
-// The select option values will be "japanese" and "chinese_simplified"
-// These keys must match those in the transformed data stored in IndexedDB.
+// ----------------------------
+// CREATE SELECT ELEMENTS
+// ----------------------------
+
+// Language select
 const languages = ['Japanese', 'Chinese Simplified'];
 const languageSelect = document.createElement('select');
 languages.forEach(lang => {
   const option = document.createElement('option');
-  option.value = lang.toLowerCase().replace(' ', '_'); // e.g. "japanese", "chinese_simplified"
+  option.value = lang.toLowerCase().replace(' ', '_'); // "japanese", "chinese_simplified"
   option.textContent = lang;
   languageSelect.appendChild(option);
 });
 app.appendChild(languageSelect);
 
-// Create font select with preferred calligraphy fonts
+// Default font mapping for each language
+const defaultFontForLanguage = {
+  japanese: '"Yuji Mai", cursive',
+  chinese_simplified: '"Noto Sans SC", sans-serif'
+};
+
+// Font select
 const fontSelect = document.createElement('select');
 const fonts = [
   { name: 'Sacramento', css: '"Sacramento", cursive' },
@@ -66,19 +67,50 @@ fonts.forEach(font => {
 });
 app.appendChild(fontSelect);
 
-// Create start button
-const startButton = document.createElement('button');
-startButton.textContent = 'Start Training';
-startButton.id = 'startButton';
-app.appendChild(startButton);
+// Level filter select
+const levelFilterSelect = document.createElement('select');
+levelFilterSelect.id = 'levelFilter';
+const defaultOptionLevel = document.createElement('option');
+defaultOptionLevel.value = 'all';
+defaultOptionLevel.textContent = 'All Levels';
+levelFilterSelect.appendChild(defaultOptionLevel);
+app.appendChild(levelFilterSelect);
 
-// Create Reload Data button
-const reloadButton = document.createElement('button');
-reloadButton.textContent = 'Reload Data';
-reloadButton.id = 'reloadButton';
-app.appendChild(reloadButton);
+// Tag filter select
+const tagFilterSelect = document.createElement('select');
+tagFilterSelect.id = 'tagFilter';
+const defaultOptionTag = document.createElement('option');
+defaultOptionTag.value = 'all';
+defaultOptionTag.textContent = 'All Tags';
+tagFilterSelect.appendChild(defaultOptionTag);
+app.appendChild(tagFilterSelect);
 
-// Global variables
+// ----------------------------
+// CREATE BUTTONS WITH EMOJI
+// ----------------------------
+const clearDataButton = document.createElement('button');
+clearDataButton.textContent = '🗑️ Clear Data';
+clearDataButton.id = 'clearDataButton';
+app.appendChild(clearDataButton);
+
+const exportButton = document.createElement('button');
+exportButton.textContent = '📤 Export Score';
+exportButton.id = 'exportButton';
+app.appendChild(exportButton);
+
+const importButton = document.createElement('button');
+importButton.textContent = '📥 Import Score';
+importButton.id = 'importButton';
+app.appendChild(importButton);
+
+const skipButton = document.createElement('button');
+skipButton.textContent = '⏭️ Skip';
+skipButton.id = 'skipButton';
+app.appendChild(skipButton);
+
+// ----------------------------
+// GLOBAL VARIABLES
+// ----------------------------
 let characterData = null;
 let selectedLanguage = languageSelect.value;
 let selectedFont = fontSelect.value;
@@ -86,20 +118,157 @@ let characterList = [];
 let currentCharacter = null; // Currently exercised character
 let drawing = false;
 
-// Update selected font when user changes selection
+// ----------------------------
+// USER SELECTION STORAGE HELPERS
+// ----------------------------
+function saveUserSelection(key, value) {
+  localStorage.setItem(key, value);
+}
+
+function loadUserSelections() {
+  const storedLanguage = localStorage.getItem("selectedLanguage");
+  const storedFont = localStorage.getItem("selectedFont");
+  const storedLevel = localStorage.getItem("selectedLevel");
+  const storedTag = localStorage.getItem("selectedTag");
+
+  if (storedLanguage) {
+    languageSelect.value = storedLanguage;
+    selectedLanguage = storedLanguage;
+  }
+  if (storedFont) {
+    fontSelect.value = storedFont;
+    selectedFont = storedFont;
+  }
+  if (storedLevel) {
+    levelFilterSelect.value = storedLevel;
+  }
+  if (storedTag) {
+    tagFilterSelect.value = storedTag;
+  }
+}
+
+// ----------------------------
+// EVENT LISTENERS
+// ----------------------------
+
+// Font select: update selected font and redraw model text if available
 fontSelect.addEventListener('change', () => {
   selectedFont = fontSelect.value;
+  saveUserSelection("selectedFont", selectedFont);
   if (currentCharacter) {
     drawModelText();
   }
 });
 
-// Reload Data button: clear old connection (if any) and fetch fresh data
-reloadButton.addEventListener('click', () => {
-  clearAndReloadData();
+// Language select: update selected language, apply default font, update filters, and restart exercise
+languageSelect.addEventListener('change', () => {
+  selectedLanguage = languageSelect.value;
+  saveUserSelection("selectedLanguage", selectedLanguage);
+  if (defaultFontForLanguage[selectedLanguage]) {
+    selectedFont = defaultFontForLanguage[selectedLanguage];
+    fontSelect.value = selectedFont;
+    saveUserSelection("selectedFont", selectedFont);
+  }
+  updateFilters();
+  startTrainingExercise();
 });
 
-// Open the database and load data on startup
+// Filter selects: update training exercise on change and save user selections
+levelFilterSelect.addEventListener('change', () => {
+  saveUserSelection("selectedLevel", levelFilterSelect.value);
+  startTrainingExercise();
+});
+tagFilterSelect.addEventListener('change', () => {
+  saveUserSelection("selectedTag", tagFilterSelect.value);
+  startTrainingExercise();
+});
+
+// Clear Data: confirm, then clear IndexedDB and caches
+clearDataButton.addEventListener('click', () => {
+  if (confirm("Are you sure you want to clear data? This will remove the IndexedDB data and cache.")) {
+    if (db) {
+      try {
+        db.close();
+      } catch (e) {
+        console.warn('Error closing DB:', e);
+      }
+      db = null;
+    }
+    const req = indexedDB.deleteDatabase("characterDB");
+    req.onsuccess = () => {
+      console.log("IndexedDB deleted successfully.");
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+      alert("Data cleared. Please reload the page.");
+    };
+    req.onerror = () => {
+      console.error("Error deleting IndexedDB.");
+    };
+  }
+});
+
+// Export Score: download current characterData as JSON
+exportButton.addEventListener('click', () => {
+  const dataStr = JSON.stringify(characterData, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "score_export.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// Import Score: read a JSON file and merge imported scores with existing data
+importButton.addEventListener('click', () => {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/json";
+  fileInput.addEventListener("change", event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const importedData = JSON.parse(e.target.result);
+        for (const lang in importedData) {
+          if (characterData[lang]) {
+            importedData[lang].forEach(importedChar => {
+              const existing = characterData[lang].find(c => c.word === importedChar.word);
+              if (existing) {
+                existing.exercises += importedChar.exercises || 0;
+                existing.failures += importedChar.failures || 0;
+              }
+            });
+          }
+        }
+        dbFunctions.saveData(characterData, () => {
+          console.log("Scores updated with imported data.");
+          alert("Import successful! Scores have been updated.");
+          startTrainingExercise();
+        });
+      } catch (error) {
+        alert("Error parsing JSON file. Please check the file format.");
+      }
+    };
+    reader.readAsText(file);
+  });
+  fileInput.click();
+});
+
+// Skip button: immediately move to the next exercise without modifying scores
+skipButton.addEventListener('click', () => {
+  startTrainingExercise();
+});
+
+// ----------------------------
+// DATABASE & DATA LOADING
+// ----------------------------
 dbFunctions.openDatabase(() => {
   dbFunctions.loadData(data => {
     if (data) {
@@ -107,32 +276,30 @@ dbFunctions.openDatabase(() => {
       console.log('Data loaded from IndexedDB');
       finishLoading();
     } else {
-      // No stored data found; fetch new data from server
+      // No stored data found; fetch from server
       fetchAndStoreData();
     }
   });
 });
 
-// Function to fetch new data from the server, transform it, and store it in IndexedDB
+// Fetch and transform new data, then store in IndexedDB
 function fetchAndStoreData() {
   Promise.all([
     fetch('japanese-jlpt.json').then(res => res.json()),
     fetch('mandarin-simplified-hsk.json').then(res => res.json())
   ])
   .then(([japaneseData, chineseData]) => {
-    // Transform Japanese data
     const transformedJapanese = japaneseData.map(item => ({
       word: item.expression,
       pronunciation: item.reading,
       translation: item.meaning,
       tags: item.tags,
-      number: null, // No numerotation for Japanese
+      number: null,
       exercises: 0,
       failures: 0
     }));
-    // Transform Chinese data
     const transformedChinese = chineseData.map(item => ({
-      number: item.No, // store the numerotation from the "No" field
+      number: item.No,
       word: item.Chinese,
       pronunciation: item.Pinyin,
       translation: item.English,
@@ -140,15 +307,10 @@ function fetchAndStoreData() {
       exercises: 0,
       failures: 0
     }));
-    
-    // Build the characterData object.
-    // The keys ("japanese", "chinese_simplified") match the language select option values.
     characterData = {
       japanese: transformedJapanese,
       chinese_simplified: transformedChinese
     };
-    
-    // Save the new data to IndexedDB (this will overwrite any old data)
     dbFunctions.saveData(characterData, () => {
       console.log('New data stored in IndexedDB.');
       finishLoading();
@@ -160,10 +322,8 @@ function fetchAndStoreData() {
   });
 }
 
-// Function to clear the existing IndexedDB data and reload fresh data.
-// This function ensures that we re-open the DB connection if it was closed.
+// (Unused) Function to clear data and reload fresh data
 function clearAndReloadData() {
-  // Close the existing connection if it exists.
   if (db) {
     try {
       db.close();
@@ -172,27 +332,26 @@ function clearAndReloadData() {
     }
     db = null;
   }
-  // Open a new connection, then fetch fresh data.
   dbFunctions.openDatabase(() => {
     fetchAndStoreData();
   });
 }
 
-// Hide loading overlay and initialize training functionality
+// ----------------------------
+// TRAINING FUNCTIONALITY
+// ----------------------------
+
+// Called after data is loaded; restores selections, updates filters, and starts training
 function finishLoading() {
   loadingOverlay.style.display = 'none';
+  loadUserSelections();
+  updateFilters();
   setupTraining();
+  startTrainingExercise();
 }
 
-// Set up training functionality
+// Set up training events and drawing functionality
 function setupTraining() {
-  startButton.addEventListener('click', () => {
-    // Use the selected language (e.g., "japanese" or "chinese_simplified")
-    selectedLanguage = languageSelect.value;
-    characterList = characterData[selectedLanguage];
-    startTrainingExercise();
-  });
-
   finishButton.addEventListener('click', () => {
     if (currentCharacter) {
       currentCharacter.exercises++;
@@ -213,9 +372,7 @@ function setupTraining() {
     lastX = x;
     lastY = y;
   });
-  canvas.addEventListener('mouseup', () => {
-    drawing = false;
-  });
+  canvas.addEventListener('mouseup', () => { drawing = false; });
   canvas.addEventListener('mousemove', e => {
     if (!drawing) return;
     const { x, y } = getCanvasCoordinates(e);
@@ -229,7 +386,7 @@ function setupTraining() {
     lastX = x;
     lastY = y;
   });
-  
+
   // Touch drawing events
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
@@ -260,7 +417,11 @@ function setupTraining() {
   });
 }
 
-// Helper function: get scaled canvas coordinates from an event
+// ----------------------------
+// HELPER FUNCTIONS
+// ----------------------------
+
+// Get canvas coordinates from an event
 function getCanvasCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
@@ -271,7 +432,7 @@ function getCanvasCoordinates(e) {
   };
 }
 
-// Helper: determine optimal font size so that text fits 80% of the canvas width
+// Calculate optimal font size so that text fits 80% of the canvas width
 function getFittingFontSize(text, maxWidth, fontFamily) {
   let min = 10, max = 500;
   while (max - min > 1) {
@@ -287,7 +448,7 @@ function getFittingFontSize(text, maxWidth, fontFamily) {
   return min;
 }
 
-// Draw background guide text using the selected font and optimal size (80% of canvas width)
+// Draw the guide text (the current character) in the canvas
 function drawModelText() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const maxTextWidth = canvas.width * 0.8;
@@ -302,16 +463,110 @@ function drawModelText() {
   ctx.restore();
 }
 
-// Start a training exercise: choose a character (prioritizing those with the fewest exercises),
-// display its guide text, translation, pronunciation, and exercise count.
+// Generate progress bar HTML and emojis based on exercise count
+function getProgressHTML(exCount) {
+  const progressBar = `<progress max="50" value="${exCount}"></progress>`;
+  let emojis = '';
+  if (exCount >= 20) { emojis += ' 🎉'; }
+  if (exCount >= 30) { emojis += ' 🎉'; }
+  if (exCount >= 50) { emojis += ' 🎉'; }
+  return progressBar + emojis;
+}
+
+// Start a training exercise by selecting a character with the fewest exercises from the filtered list
 function startTrainingExercise() {
-  const minExercises = Math.min(...characterList.map(c => c.exercises));
-  const candidates = characterList.filter(c => c.exercises === minExercises);
+  let fullList = characterData[selectedLanguage] || [];
+  
+  // Apply level filter
+  const levelFilter = levelFilterSelect.value;
+  if (levelFilter !== 'all') {
+    fullList = fullList.filter(c => {
+      if (selectedLanguage === 'chinese_simplified') {
+        return c.level === levelFilter;
+      } else if (selectedLanguage === 'japanese' && c.tags) {
+        return c.tags.split(' ').some(tag => tag === levelFilter);
+      }
+      return true;
+    });
+  }
+  
+  // Apply tag filter
+  const tagFilter = tagFilterSelect.value;
+  if (tagFilter !== 'all') {
+    fullList = fullList.filter(c => c.tags && c.tags.split(' ').includes(tagFilter));
+  }
+  
+  if (!fullList.length) {
+    translationDisplay.innerHTML = 'Aucun caractère ne correspond aux filtres sélectionnés.';
+    return;
+  }
+  
+  const minExercises = Math.min(...fullList.map(c => c.exercises));
+  const candidates = fullList.filter(c => c.exercises === minExercises);
   currentCharacter = candidates[Math.floor(Math.random() * candidates.length)];
+  
   drawModelText();
-  translationDisplay.innerHTML = `Translation: ${currentCharacter.translation}<br>
+  
+  let levelStr = '';
+  if (currentCharacter.level) {
+    levelStr = ` (${currentCharacter.level})`;
+  } else if (selectedLanguage === 'japanese' && currentCharacter.tags) {
+    const jlptTag = currentCharacter.tags.split(' ').find(tag => tag.includes('JLPT'));
+    if (jlptTag) { levelStr = ` (${jlptTag})`; }
+  }
+  
+  translationDisplay.innerHTML = `
+    Translation: ${currentCharacter.translation}${levelStr}<br>
     Pronunciation: ${currentCharacter.pronunciation || 'N/A'}<br>
-    Exercises: ${currentCharacter.exercises}`;
+    Exercises: ${currentCharacter.exercises} ${getProgressHTML(currentCharacter.exercises)}
+  `;
   finishButton.style.display = 'inline-block';
 }
 
+// Update filter dropdowns based on the available data for the selected language
+function updateFilters() {
+  let list = characterData[selectedLanguage] || [];
+  const levels = new Set();
+  const tags = new Set();
+  
+  list.forEach(item => {
+    if (selectedLanguage === 'chinese_simplified' && item.level) {
+      levels.add(item.level);
+    } else if (selectedLanguage === 'japanese' && item.tags) {
+      item.tags.split(' ').forEach(tag => {
+        if (tag.includes('JLPT')) {
+          levels.add(tag);
+        }
+      });
+    }
+    if (item.tags) {
+      item.tags.split(' ').forEach(tag => tags.add(tag));
+    }
+  });
+  
+  // Update level filter dropdown
+  levelFilterSelect.innerHTML = '';
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = 'all';
+  defaultOpt.textContent = 'All Levels';
+  levelFilterSelect.appendChild(defaultOpt);
+  Array.from(levels).sort().forEach(lvl => {
+    const opt = document.createElement('option');
+    opt.value = lvl;
+    opt.textContent = lvl;
+    levelFilterSelect.appendChild(opt);
+  });
+  
+  // Update tag filter dropdown
+  tagFilterSelect.innerHTML = '';
+  const defaultOptTag = document.createElement('option');
+  defaultOptTag.value = 'all';
+  defaultOptTag.textContent = 'All Tags';
+  tagFilterSelect.appendChild(defaultOptTag);
+  Array.from(tags).sort().forEach(tag => {
+    const opt = document.createElement('option');
+    opt.value = tag;
+    opt.textContent = tag;
+    tagFilterSelect.appendChild(opt);
+  });
+}

@@ -1,10 +1,10 @@
 // service-worker.js
 
 // Generate a unique cache name based on the current timestamp.
-const CACHE_VERSION = new Date().getTime();
-const CACHE_NAME = `character-trainer-${CACHE_VERSION}`;
+const LIVE_CACHE = 'yapishu-v1';
+const TEMP_CACHE = 'yapishu-temp-v1';
 
-const urlsToCache = [
+const ASSETS = [
   '/',
   '/index.html',
   '/main.js',
@@ -18,49 +18,78 @@ const urlsToCache = [
   '/favicon.webp'
 ];
 
+// Install: Download all assets into a temporary cache.
 self.addEventListener('install', event => {
-  self.skipWaiting(); // Force the new SW to skip waiting.
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.open(TEMP_CACHE).then(tempCache => {
+      // Fetch and cache every asset.
       return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+        ASSETS.map(url => {
+          return fetch(url).then(response => {
+            if (!response.ok) {
+              throw new Error(`Failed to fetch ${url}`);
+            }
+            return tempCache.put(url, response.clone());
+          });
         })
       );
-    }).then(() => {
-      return self.clients.claim();
-    }).then(() => {
-      // After taking control, notify clients to reload.
-      return self.clients.matchAll().then(clients => {
-        clients.forEach(client => client.postMessage({ action: 'reload' }));
-      });
     })
   );
 });
 
+// Activate: If staging is complete, replace the live cache.
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    (async () => {
+      const tempCache = await caches.open(TEMP_CACHE);
+      const cachedRequests = await tempCache.keys();
+      if (cachedRequests.length === ASSETS.length) {
+        // New version is fully staged. Delete the old live cache.
+        await caches.delete(LIVE_CACHE);
+        const liveCache = await caches.open(LIVE_CACHE);
+        // Copy everything from the temporary cache to the live cache.
+        for (const request of cachedRequests) {
+          const response = await tempCache.match(request);
+          await liveCache.put(request, response);
+        }
+        // Delete the temporary cache.
+        await caches.delete(TEMP_CACHE);
+        // Optionally, notify clients to reload.
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => client.postMessage({ action: 'reload' }));
+      } else {
+        // If staging failed, delete the temporary cache and keep the old live cache.
+        console.error('Staging failed. Keeping the old cache.');
+        await caches.delete(TEMP_CACHE);
+      }
+      await self.clients.claim();
+    })()
+  );
+});
+
+// Fetch: Always try the network first, but fall back to live cache if offline.
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Return the cached response if found.
-        if (response) {
-          return response;
-        }
-        // Otherwise, attempt a network fetch.
-        return fetch(event.request).catch(() => {
-          // If the request is for navigation and network fails, return cached index.html.
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+    fetch(event.request)
+      .then(networkResponse => {
+        // Update the live cache with the fresh response.
+        const responseClone = networkResponse.clone();
+        caches.open(LIVE_CACHE).then(cache => {
+          cache.put(event.request, responseClone);
+        });
+        return networkResponse;
+      })
+      .catch(() => {
+        // If network fails, try to serve from the live cache.
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
           }
+          // Optionally, return a fallback for unmatched requests.
+          return new Response('Network error occurred', {
+            status: 408,
+            statusText: 'Network error'
+          });
         });
       })
   );
