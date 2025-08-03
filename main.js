@@ -16,6 +16,10 @@ const ctx = canvas.getContext('2d');
 // Coordinates for drawing
 let lastX = 0, lastY = 0;
 
+
+// Instanciate after global variables
+const tts = new TTSPronunciation();
+
 // ----------------------------
 // CREATE SELECT ELEMENTS
 // ----------------------------
@@ -518,10 +522,15 @@ function startTrainingExercise() {
     const jlptTag = currentCharacter.tags.split(' ').find(tag => tag.includes('JLPT'));
     if (jlptTag) { levelStr = ` (${jlptTag})`; }
   }
+
+ const isSupported = tts.isLanguageSupported(selectedLanguage);
+    const ttsButton = isSupported 
+        ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Écouter la prononciation">🔊</button>`
+        : `<span class="tts-button" style="cursor: not-allowed;" title="TTS non disponible">🔊</span>`;
   
   translationDisplay.innerHTML = `
     Translation: ${currentCharacter.translation}${levelStr}<br>
-    Pronunciation: ${currentCharacter.pronunciation || 'N/A'}<br>
+    Pronunciation: ${currentCharacter.pronunciation || 'N/A'}${ttsButton}<br>
     Exercises: ${currentCharacter.exercises} ${getProgressHTML(currentCharacter.exercises)}
   `;
   finishButton.style.display = 'inline-block';
@@ -579,3 +588,45 @@ function updateFilters() {
     tagFilterSelect.appendChild(opt);
   });
 }
+
+//TTS Functions
+
+class TTSPronunciation {
+    constructor() {
+        this.synth = window.speechSynthesis;
+        this.supportedLanguages = {
+            'japanese': ['ja', 'ja-JP'],
+            'chinese_simplified': ['zh', 'zh-CN'],
+            'russian': ['ru', 'ru-RU']
+        };
+    }
+    
+    isLanguageSupported(language) {
+        if (!this.synth) return false;
+        const voices = this.synth.getVoices();
+        const langCodes = this.supportedLanguages[language] || [];
+        return voices.some(voice => 
+            langCodes.some(code => voice.lang.startsWith(code))
+        );
+    }
+    
+    speak(text, language) {
+        if (!this.isLanguageSupported(language)) return;
+        
+        const voices = this.synth.getVoices();
+        const langCodes = this.supportedLanguages[language];
+        const voice = voices.find(v => 
+            langCodes.some(code => v.lang.startsWith(code))
+        );
+        
+        if (voice) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.voice = voice;
+            utterance.rate = 0.8;
+            this.synth.speak(utterance);
+        }
+    }
+}
+
+
+
