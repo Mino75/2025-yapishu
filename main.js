@@ -277,7 +277,7 @@ function fetchAndStoreData() {
     fetch('mandarin-simplified-hsk.json').then(res => res.json()),
     fetch('russian-torfl.json').then(res => res.json())
   ])
-  .then(([japaneseData, chineseData]) => {
+  .then(([japaneseData, chineseData,russianData]) => {
     const transformedJapanese = japaneseData.map(item => ({
       word: item.expression,
       pronunciation: item.reading,
