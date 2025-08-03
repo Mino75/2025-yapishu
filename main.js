@@ -304,10 +304,9 @@ function fetchAndStoreData() {
         const transformedRussian = russianData.map(item => ({
       number: item.id,
       word: item.Russian,
-      pronunciation: item.Russian, // Pas de transcription séparée dans le JSON
+      pronunciation: item.Russian, 
       translation: item.English,
-      levels: item.Levels, // Note: "Levels" au pluriel dans le JSON russe
-      exercises: 0,
+      levels: item.Levels, // Note: "Levels" 
       failures: 0
     }));
     
