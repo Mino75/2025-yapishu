@@ -112,6 +112,36 @@ style.innerHTML = `
       font-size: 1.25rem;
       padding: 1rem 1.5rem;
     }
+/* TTS */
+    .tts-button {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.tts-button:hover:not(:disabled) {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.tts-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.tts-button.speaking {
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+`;
     
     #translationDisplay {
       font-size: 1.5rem;
