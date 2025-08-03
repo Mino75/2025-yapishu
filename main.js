@@ -543,7 +543,7 @@ function updateFilters() {
         }
       });
     } else if (selectedLanguage === 'russian' && item.levels) { // ← Ajouter cette condition
-      // Le champ "Levels" contient des niveaux séparés par des virgules comme "B1, B4"
+      // Le champ "Levels" contient des niveaux séparés par des virgules comme "B1, B2"
       item.levels.split(', ').forEach(level => {
       levels.add(level.trim());
       });
