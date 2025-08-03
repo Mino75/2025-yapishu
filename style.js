@@ -140,9 +140,7 @@ style.innerHTML = `
 @keyframes pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.1); }
-}
-`;
-    
+}   
     #translationDisplay {
       font-size: 1.5rem;
     }
