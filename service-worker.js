@@ -87,7 +87,7 @@ const ASSETS = [
   '/russian-torfl.json', // New JSON file for Chinese Simplified
   '/icon-512.png',
   '/icon-192.png',
-  '/logo.webp'
+  '/logo.webp',
   '/favicon.ico'
 ];
 
