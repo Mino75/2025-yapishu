@@ -17,8 +17,7 @@ const ctx = canvas.getContext('2d');
 let lastX = 0, lastY = 0;
 
 
-// Instanciate after global variables
-const tts = new TTSPronunciation();
+
 
 // ----------------------------
 // CREATE SELECT ELEMENTS
@@ -627,6 +626,9 @@ class TTSPronunciation {
         }
     }
 }
+
+// Instanciate after global variables
+const tts = new TTSPronunciation();
 
 
 
