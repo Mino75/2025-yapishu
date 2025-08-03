@@ -21,7 +21,7 @@ let lastX = 0, lastY = 0;
 // ----------------------------
 
 // Language select
-const languages = ['Japanese', 'Chinese Simplified'];
+const languages = ['Japanese', 'Chinese Simplified', 'Russian'];
 const languageSelect = document.createElement('select');
 languages.forEach(lang => {
   const option = document.createElement('option');
@@ -34,7 +34,8 @@ app.appendChild(languageSelect);
 // Default font mapping for each language
 const defaultFontForLanguage = {
   japanese: '"Yuji Mai", cursive',
-  chinese_simplified: '"Noto Sans SC", sans-serif'
+  chinese_simplified: '"Noto Sans SC", sans-serif',
+  russian: 'Arial, sans-serif' 
 };
 
 // Font select
@@ -273,7 +274,8 @@ dbFunctions.openDatabase(() => {
 function fetchAndStoreData() {
   Promise.all([
     fetch('japanese-jlpt.json').then(res => res.json()),
-    fetch('mandarin-simplified-hsk.json').then(res => res.json())
+    fetch('mandarin-simplified-hsk.json').then(res => res.json()),
+    fetch('russian-torfl.json').then(res => res.json())
   ])
   .then(([japaneseData, chineseData]) => {
     const transformedJapanese = japaneseData.map(item => ({
@@ -294,9 +296,21 @@ function fetchAndStoreData() {
       exercises: 0,
       failures: 0
     }));
+
+        const transformedRussian = russianData.map(item => ({
+      number: item.id,
+      word: item.Russian,
+      pronunciation: item.Russian, // Pas de transcription séparée dans le JSON
+      translation: item.English,
+      levels: item.Levels, // Note: "Levels" au pluriel dans le JSON russe
+      exercises: 0,
+      failures: 0
+    }));
+    
     characterData = {
       japanese: transformedJapanese,
-      chinese_simplified: transformedChinese
+      chinese_simplified: transformedChinese,
+      russian: transformedRussian
     };
     dbFunctions.saveData(characterData, () => {
       console.log('New data stored in IndexedDB.');
@@ -472,6 +486,8 @@ function startTrainingExercise() {
         return c.level === levelFilter;
       } else if (selectedLanguage === 'japanese' && c.tags) {
         return c.tags.split(' ').some(tag => tag === levelFilter);
+      } else if (selectedLanguage === 'russian' && c.levels) { // ← Ajouter cette condition
+      return c.levels.split(', ').some(level => level.trim() === levelFilter);
       }
       return true;
     });
@@ -524,6 +540,11 @@ function updateFilters() {
         if (tag.includes('JLPT')) {
           levels.add(tag);
         }
+      });
+    } else if (selectedLanguage === 'russian' && item.levels) { // ← Ajouter cette condition
+      // Le champ "Levels" contient des niveaux séparés par des virgules comme "B1, B4"
+      item.levels.split(', ').forEach(level => {
+      levels.add(level.trim());
       });
     }
     if (item.tags) {
