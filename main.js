@@ -44,6 +44,7 @@ const fonts = [
   { name: 'Sacramento', css: '"Sacramento", cursive' },
   { name: 'Ma Shan Zheng', css: '"Ma Shan Zheng", cursive' },
   { name: 'Yuji Mai', css: '"Yuji Mai", cursive' },
+  { name: 'Marck Script', css: '"Marck Script", cursive' },
   { name: 'Noto Sans SC', css: '"Noto Sans SC", sans-serif' },
   { name: 'Arial', css: 'Arial, sans-serif' }
 ];
