@@ -1,7 +1,5 @@
 // main.js
 
-
-
 // ----------------------------
 // DOM ELEMENT REFERENCES
 // ----------------------------
@@ -15,9 +13,6 @@ const ctx = canvas.getContext('2d');
 
 // Coordinates for drawing
 let lastX = 0, lastY = 0;
-
-
-
 
 // ----------------------------
 // CREATE SELECT ELEMENTS
@@ -100,6 +95,11 @@ skipButton.textContent = '⏭️ Skip';
 skipButton.id = 'skipButton';
 app.appendChild(skipButton);
 
+const reviewButton = document.createElement('button');
+reviewButton.textContent = '📋 Review';
+reviewButton.id = 'reviewButton';
+app.appendChild(reviewButton);
+
 // ----------------------------
 // GLOBAL VARIABLES
 // ----------------------------
@@ -175,9 +175,9 @@ tagFilterSelect.addEventListener('change', () => {
   startTrainingExercise();
 });
 
-// Clear Data: confirm, then clear IndexedDB and caches
+// Clear Data: confirm, then clear IndexedDB and caches with auto-reload
 clearDataButton.addEventListener('click', () => {
-  if (confirm("Are you sure you want to clear data? This will remove the IndexedDB data and cache.")) {
+  if (confirm("Are you sure you want to clear data? This will remove the IndexedDB data and cache, then reload the page.")) {
     if (db) {
       try {
         db.close();
@@ -192,12 +192,18 @@ clearDataButton.addEventListener('click', () => {
       if ('caches' in window) {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name));
+        }).then(() => {
+          // Auto-reload the page after clearing caches
+          window.location.reload();
         });
+      } else {
+        // Auto-reload even if caches API is not available
+        window.location.reload();
       }
-      alert("Data cleared. Please reload the page.");
     };
     req.onerror = () => {
       console.error("Error deleting IndexedDB.");
+      alert("Error occurred while clearing data. Please try again.");
     };
   }
 });
@@ -258,6 +264,174 @@ skipButton.addEventListener('click', () => {
   startTrainingExercise();
 });
 
+// Review Button functionality
+reviewButton.addEventListener('click', () => {
+  openReviewPopup();
+});
+
+// ----------------------------
+// REVIEW POPUP FUNCTIONS
+// ----------------------------
+function openReviewPopup() {
+  let fullList = characterData[selectedLanguage] || [];
+  
+  // Apply current level filter
+  const levelFilter = levelFilterSelect.value;
+  if (levelFilter !== 'all') {
+    fullList = fullList.filter(c => {
+      if (selectedLanguage === 'chinese_simplified') {
+        return c.level === levelFilter;
+      } else if (selectedLanguage === 'japanese' && c.tags) {
+        return c.tags.split(' ').some(tag => tag === levelFilter);
+      } else if (selectedLanguage === 'russian' && c.levels) {
+        return c.levels.split(', ').some(level => level.trim() === levelFilter);
+      }
+      return true;
+    });
+  }
+
+  // Sort by training value (descending) then alphabetically
+  fullList.sort((a, b) => {
+    if (b.exercises !== a.exercises) {
+      return b.exercises - a.exercises; // Higher training values first
+    }
+    return a.word.localeCompare(b.word); // Then alphabetically
+  });
+
+  // Create popup modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  `;
+
+  const popup = document.createElement('div');
+  popup.style.cssText = `
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 80%;
+    max-height: 80%;
+    overflow-y: auto;
+    position: relative;
+  `;
+
+  // Popup header
+  const header = document.createElement('div');
+  header.innerHTML = `
+    <h3>Review Characters - ${selectedLanguage.replace('_', ' ')} ${levelFilter !== 'all' ? `(${levelFilter})` : ''}</h3>
+    <button id="closeReviewPopup" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 20px; cursor: pointer;">✖</button>
+  `;
+  popup.appendChild(header);
+
+  // Character list
+  const listContainer = document.createElement('div');
+  listContainer.style.cssText = `
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+  `;
+
+  if (fullList.length === 0) {
+    listContainer.innerHTML = '<p>No characters found for the current filters.</p>';
+  } else {
+    fullList.forEach(character => {
+      const item = document.createElement('div');
+      item.style.cssText = `
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      `;
+      
+      item.innerHTML = `
+        <div>
+          <strong style="font-size: 18px; font-family: ${selectedFont};">${character.word}</strong>
+          <span style="margin-left: 10px; color: #666;">${character.translation}</span>
+        </div>
+        <div style="text-align: right;">
+          <span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px;">
+            ${character.exercises} exercises
+          </span>
+        </div>
+      `;
+      
+      item.addEventListener('mouseenter', () => {
+        item.style.backgroundColor = '#f0f0f0';
+      });
+      
+      item.addEventListener('mouseleave', () => {
+        item.style.backgroundColor = 'transparent';
+      });
+      
+      item.addEventListener('click', () => {
+        // Close popup and load training for this character
+        document.body.removeChild(modal);
+        loadSpecificCharacter(character);
+      });
+      
+      listContainer.appendChild(item);
+    });
+  }
+
+  popup.appendChild(listContainer);
+  modal.appendChild(popup);
+  document.body.appendChild(modal);
+
+  // Close popup handlers
+  document.getElementById('closeReviewPopup').addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      document.body.removeChild(modal);
+    }
+  });
+}
+
+function loadSpecificCharacter(character) {
+  currentCharacter = character;
+  drawModelText();
+  
+  let levelStr = '';
+  if (currentCharacter.level) {
+    levelStr = ` (${currentCharacter.level})`;
+  } else if (selectedLanguage === 'japanese' && currentCharacter.tags) {
+    const jlptTag = currentCharacter.tags.split(' ').find(tag => tag.includes('JLPT'));
+    if (jlptTag) { levelStr = ` (${jlptTag})`; }
+  } else if (selectedLanguage === 'russian' && currentCharacter.levels) {
+    levelStr = ` (${currentCharacter.levels})`;
+  }
+
+  const isSupported = tts.isLanguageSupported(selectedLanguage);
+  const ttsButton = isSupported 
+    ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Écouter la prononciation">🔊</button>`
+    : `<span class="tts-button" style="cursor: not-allowed;" title="TTS non disponible">🔊</span>`;
+  
+  translationDisplay.innerHTML = `
+    Translation: ${currentCharacter.translation}${levelStr}<br>
+    Pronunciation: ${currentCharacter.pronunciation || 'N/A'}${ttsButton}<br>
+    Exercises: ${currentCharacter.exercises} ${getProgressHTML(currentCharacter.exercises)}
+  `;
+  finishButton.style.display = 'inline-block';
+  
+  // Clear canvas for new training
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 // ----------------------------
 // DATABASE & DATA LOADING
 // ----------------------------
@@ -281,7 +455,7 @@ function fetchAndStoreData() {
     fetch('mandarin-simplified-hsk.json').then(res => res.json()),
     fetch('russian-torfl.json').then(res => res.json())
   ])
-  .then(([japaneseData, chineseData,russianData]) => {
+  .then(([japaneseData, chineseData, russianData]) => {
     const transformedJapanese = japaneseData.map(item => ({
       word: item.expression,
       pronunciation: item.reading,
@@ -301,12 +475,13 @@ function fetchAndStoreData() {
       failures: 0
     }));
 
-        const transformedRussian = russianData.map(item => ({
+    const transformedRussian = russianData.map(item => ({
       number: item.id,
       word: item.Russian,
       pronunciation: item.Russian, 
       translation: item.English,
       levels: item.Levels, // Note: "Levels" 
+      exercises: 0,
       failures: 0
     }));
     
@@ -489,8 +664,8 @@ function startTrainingExercise() {
         return c.level === levelFilter;
       } else if (selectedLanguage === 'japanese' && c.tags) {
         return c.tags.split(' ').some(tag => tag === levelFilter);
-      } else if (selectedLanguage === 'russian' && c.levels) { // ← Ajouter cette condition
-      return c.levels.split(', ').some(level => level.trim() === levelFilter);
+      } else if (selectedLanguage === 'russian' && c.levels) {
+        return c.levels.split(', ').some(level => level.trim() === levelFilter);
       }
       return true;
     });
@@ -519,12 +694,14 @@ function startTrainingExercise() {
   } else if (selectedLanguage === 'japanese' && currentCharacter.tags) {
     const jlptTag = currentCharacter.tags.split(' ').find(tag => tag.includes('JLPT'));
     if (jlptTag) { levelStr = ` (${jlptTag})`; }
+  } else if (selectedLanguage === 'russian' && currentCharacter.levels) {
+    levelStr = ` (${currentCharacter.levels})`;
   }
 
- const isSupported = tts.isLanguageSupported(selectedLanguage);
-    const ttsButton = isSupported 
-        ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Écouter la prononciation">🔊</button>`
-        : `<span class="tts-button" style="cursor: not-allowed;" title="TTS non disponible">🔊</span>`;
+  const isSupported = tts.isLanguageSupported(selectedLanguage);
+  const ttsButton = isSupported 
+    ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Écouter la prononciation">🔊</button>`
+    : `<span class="tts-button" style="cursor: not-allowed;" title="TTS non disponible">🔊</span>`;
   
   translationDisplay.innerHTML = `
     Translation: ${currentCharacter.translation}${levelStr}<br>
@@ -549,10 +726,10 @@ function updateFilters() {
           levels.add(tag);
         }
       });
-    } else if (selectedLanguage === 'russian' && item.levels) { // ← Ajouter cette condition
+    } else if (selectedLanguage === 'russian' && item.levels) {
       // Le champ "Levels" contient des niveaux séparés par des virgules comme "B1, B2"
       item.levels.split(', ').forEach(level => {
-      levels.add(level.trim());
+        levels.add(level.trim());
       });
     }
     if (item.tags) {
@@ -587,47 +764,46 @@ function updateFilters() {
   });
 }
 
-//TTS Functions
+// ----------------------------
+// TTS FUNCTIONS
+// ----------------------------
 
 class TTSPronunciation {
-    constructor() {
-        this.synth = window.speechSynthesis;
-        this.supportedLanguages = {
-            'japanese': ['ja', 'ja-JP'],
-            'chinese_simplified': ['zh', 'zh-CN'],
-            'russian': ['ru', 'ru-RU']
-        };
-    }
+  constructor() {
+    this.synth = window.speechSynthesis;
+    this.supportedLanguages = {
+      'japanese': ['ja', 'ja-JP'],
+      'chinese_simplified': ['zh', 'zh-CN'],
+      'russian': ['ru', 'ru-RU']
+    };
+  }
+  
+  isLanguageSupported(language) {
+    if (!this.synth) return false;
+    const voices = this.synth.getVoices();
+    const langCodes = this.supportedLanguages[language] || [];
+    return voices.some(voice => 
+      langCodes.some(code => voice.lang.startsWith(code))
+    );
+  }
+  
+  speak(text, language) {
+    if (!this.isLanguageSupported(language)) return;
     
-    isLanguageSupported(language) {
-        if (!this.synth) return false;
-        const voices = this.synth.getVoices();
-        const langCodes = this.supportedLanguages[language] || [];
-        return voices.some(voice => 
-            langCodes.some(code => voice.lang.startsWith(code))
-        );
-    }
+    const voices = this.synth.getVoices();
+    const langCodes = this.supportedLanguages[language];
+    const voice = voices.find(v => 
+      langCodes.some(code => v.lang.startsWith(code))
+    );
     
-    speak(text, language) {
-        if (!this.isLanguageSupported(language)) return;
-        
-        const voices = this.synth.getVoices();
-        const langCodes = this.supportedLanguages[language];
-        const voice = voices.find(v => 
-            langCodes.some(code => v.lang.startsWith(code))
-        );
-        
-        if (voice) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.voice = voice;
-            utterance.rate = 0.8;
-            this.synth.speak(utterance);
-        }
+    if (voice) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voice;
+      utterance.rate = 0.8;
+      this.synth.speak(utterance);
     }
+  }
 }
 
-// Instanciate after global variables
+// Instantiate TTS after global variables
 const tts = new TTSPronunciation();
-
-
-
