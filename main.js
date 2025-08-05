@@ -272,6 +272,7 @@ reviewButton.addEventListener('click', () => {
 // ----------------------------
 // REVIEW POPUP FUNCTIONS
 // ----------------------------
+// Updated openReviewPopup function that uses CSS classes from style.js
 function openReviewPopup() {
   let fullList = characterData[selectedLanguage] || [];
   
@@ -298,90 +299,33 @@ function openReviewPopup() {
     return a.word.localeCompare(b.word); // Then alphabetically
   });
 
-  // Create popup modal
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  `;
-
-  const popup = document.createElement('div');
-  popup.style.cssText = `
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    max-width: 80%;
-    max-height: 80%;
-    overflow-y: auto;
-    position: relative;
-  `;
-
-  // Popup header
-  const header = document.createElement('div');
-  header.innerHTML = `
-    <h3>Review Characters - ${selectedLanguage.replace('_', ' ')} ${levelFilter !== 'all' ? `(${levelFilter})` : ''}</h3>
-    <button id="closeReviewPopup" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 20px; cursor: pointer;">✖</button>
-  `;
+  // Create popup modal using helper functions
+  const modal = window.styleHelpers.createPopupModal();
+  const popup = window.styleHelpers.createPopupContent();
+  
+  // Create and add header
+  const title = `Review Characters - ${selectedLanguage.replace('_', ' ')} ${levelFilter !== 'all' ? `(${levelFilter})` : ''}`;
+  const header = window.styleHelpers.createPopupHeader(title, () => {
+    document.body.removeChild(modal);
+  });
   popup.appendChild(header);
 
-  // Character list
-  const listContainer = document.createElement('div');
-  listContainer.style.cssText = `
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-  `;
-
+  // Create character list container
+  const listContainer = window.styleHelpers.createCharacterListContainer();
+  
   if (fullList.length === 0) {
-    listContainer.innerHTML = '<p>No characters found for the current filters.</p>';
+    window.styleHelpers.showNoCharactersMessage(listContainer);
   } else {
     fullList.forEach(character => {
-      const item = document.createElement('div');
-      item.style.cssText = `
-        padding: 8px;
-        border-bottom: 1px solid #eee;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      `;
-      
-      item.innerHTML = `
-        <div>
-          <strong style="font-size: 18px; font-family: ${selectedFont};">${character.word}</strong>
-          <span style="margin-left: 10px; color: #666;">${character.translation}</span>
-        </div>
-        <div style="text-align: right;">
-          <span style="background: #007bff; color: white; padding: 2px 6px; border-radius: 12px; font-size: 12px;">
-            ${character.exercises} exercises
-          </span>
-        </div>
-      `;
-      
-      item.addEventListener('mouseenter', () => {
-        item.style.backgroundColor = '#f0f0f0';
-      });
-      
-      item.addEventListener('mouseleave', () => {
-        item.style.backgroundColor = 'transparent';
-      });
-      
-      item.addEventListener('click', () => {
-        // Close popup and load training for this character
-        document.body.removeChild(modal);
-        loadSpecificCharacter(character);
-      });
-      
+      const item = window.styleHelpers.createCharacterItem(
+        character, 
+        selectedFont, 
+        (character) => {
+          // Close popup and load training for this character
+          document.body.removeChild(modal);
+          loadSpecificCharacter(character);
+        }
+      );
       listContainer.appendChild(item);
     });
   }
@@ -390,17 +334,14 @@ function openReviewPopup() {
   modal.appendChild(popup);
   document.body.appendChild(modal);
 
-  // Close popup handlers
-  document.getElementById('closeReviewPopup').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
-
+  // Close popup when clicking outside
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       document.body.removeChild(modal);
     }
   });
 }
+
 
 function loadSpecificCharacter(character) {
   currentCharacter = character;
