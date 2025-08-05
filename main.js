@@ -189,6 +189,11 @@ clearDataButton.addEventListener('click', () => {
     const req = indexedDB.deleteDatabase("characterDB");
     req.onsuccess = () => {
       console.log("IndexedDB deleted successfully.");
+      
+      //  Clear additional browser storage:
+      localStorage.clear();
+      sessionStorage.clear();
+      
       if ('caches' in window) {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name));
