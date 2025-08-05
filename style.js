@@ -269,6 +269,15 @@ style.innerHTML = `
       max-width: 70%;
       max-height: 70%;
     }
+
+    #finishExerciseButton {
+  display: none;
+}
+
+#translationDisplay {
+  font-size: 20px;
+  margin-top: 10px;
+}
     
     .character-list-container {
       max-height: 500px;
