@@ -376,6 +376,8 @@ function loadSpecificCharacter(character) {
   
   // Clear canvas for new training
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+// draw moel
+   drawModelText();
 }
 
 // ----------------------------
