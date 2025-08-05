@@ -26,13 +26,11 @@
       });
     }
   </script>
-
 </head>
 <body>
-
   <!-- Logo at the top -->
   <header>
-
+    <div id="logo-container"></div>
   </header>
 
   <!-- Loading overlay shown while data loads -->
@@ -41,18 +39,44 @@
   </div>
   
   <h1>я пишу</h1>
+  
+  <!-- Control panel with selects -->
+  <div id="controls">
+    <div class="control-group">
+      <label for="language-select">Language:</label>
+      <select id="language-select"></select>
+    </div>
+    <div class="control-group">
+      <label for="font-select">Font:</label>
+      <select id="font-select"></select>
+    </div>
+    <div class="control-group">
+      <label for="level-select">Level:</label>
+      <select id="level-select"></select>
+    </div>
+  </div>
+  
+  <!-- Main app container for dynamic content -->
   <div id="app"></div>
   
   <!-- Button to finish an exercise / show next character -->
   <button id="finishExerciseButton" style="display:none;">Next Character</button>
+  
   <!-- Container to display translation, pronunciation, and exercise count -->
-  <div id="translationDisplay" style="font-size:20px; margin-top:10px;"></div>
+  <div id="translationDisplay"></div>
   
   <!-- Canvas for drawing -->
-  <canvas id="canvas" width="500" height="500"></canvas>
+  <div id="canvas-container">
+    <canvas id="canvas" width="500" height="500"></canvas>
+    <div id="canvas-controls">
+      <button id="clearCanvas">Clear</button>
+      <button id="undoCanvas">Undo</button>
+    </div>
+  </div>
   
-  <!-- Inject styles and then the db and main scripts -->
+  <!-- Scripts -->
   <script src="style.js"></script>
+  <script src="components.js"></script>
   <script src="db.js"></script>
   <script src="main.js"></script>
 </body>
