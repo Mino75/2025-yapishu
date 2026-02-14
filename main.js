@@ -946,3 +946,232 @@ class TTSPronunciation {
 
 // Instantiate
 const tts = new TTSPronunciation();
+
+// =============================
+// TRAINER TOOLS (Kizuna extension-style registry)
+// =============================
+
+const TRAINER_TOOLS = {
+  "trainer.startTrainingExercise": {
+    description: "Start/advance to the next training exercise using current filters and language.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    handler: async () => {
+      startTrainingExercise();
+      return { ok: true };
+    }
+  },
+
+  "trainer.skip": {
+    description: "Skip the current exercise (counts as failure) and moves to the next one.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    handler: async () => {
+      // Prefer calling the same UX path to keep behavior identical
+      if (typeof skipButton?.click === "function") skipButton.click();
+      else {
+        // Fallback: replicate skip handler
+        if (currentCharacter) {
+          currentCharacter.failures = Number(currentCharacter.failures || 0) + 1;
+          dbFunctions.updateCharacter(selectedLanguage, currentCharacter, characterData, () => {});
+        }
+        startTrainingExercise();
+      }
+      return { ok: true };
+    }
+  },
+
+  "trainer.finish": {
+    description: "Mark the current exercise as finished (increments exercises) and moves to the next one.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    handler: async () => {
+      if (typeof finishButton?.click === "function") finishButton.click();
+      else {
+        if (currentCharacter) {
+          currentCharacter.exercises = Number(currentCharacter.exercises || 0) + 1;
+          dbFunctions.updateCharacter(selectedLanguage, currentCharacter, characterData, () => {});
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          translationDisplay.textContent = "";
+          finishButton.style.display = "none";
+          startTrainingExercise();
+        }
+      }
+      return { ok: true };
+    }
+  },
+
+  "trainer.setLanguage": {
+    description: "Set the training language (japanese, chinese_simplified, russian) and restart exercise.",
+    parameters: {
+      type: "object",
+      properties: {
+        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] }
+      },
+      required: ["language"],
+      additionalProperties: false
+    },
+    handler: async ({ language }) => {
+      languageSelect.value = language;
+      languageSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true, language };
+    }
+  },
+
+  "trainer.setFont": {
+    description: "Set the current font (CSS font-family value) and redraw model text when applicable.",
+    parameters: {
+      type: "object",
+      properties: {
+        fontCss: { type: "string" }
+      },
+      required: ["fontCss"],
+      additionalProperties: false
+    },
+    handler: async ({ fontCss }) => {
+      fontSelect.value = fontCss;
+      fontSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true, fontCss };
+    }
+  },
+
+  "trainer.setLevelFilter": {
+    description: "Set the level filter value and restart exercise.",
+    parameters: {
+      type: "object",
+      properties: { level: { type: "string" } },
+      required: ["level"],
+      additionalProperties: false
+    },
+    handler: async ({ level }) => {
+      levelFilterSelect.value = level;
+      levelFilterSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true, level };
+    }
+  },
+
+  "trainer.setTagFilter": {
+    description: "Set the tag filter value and restart exercise.",
+    parameters: {
+      type: "object",
+      properties: { tag: { type: "string" } },
+      required: ["tag"],
+      additionalProperties: false
+    },
+    handler: async ({ tag }) => {
+      tagFilterSelect.value = tag;
+      tagFilterSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true, tag };
+    }
+  },
+
+  "trainer.toggleModel": {
+    description: "Show/hide the model (guide text) on the canvas.",
+    parameters: {
+      type: "object",
+      properties: {
+        show: { type: "boolean", description: "true=show model, false=hide model" }
+      },
+      required: ["show"],
+      additionalProperties: false
+    },
+    handler: async ({ show }) => {
+      setShowModel(!!show);
+      return { ok: true, show: !!show };
+    }
+  },
+
+  "trainer.openReview": {
+    description: "Open the review popup for the current language and filters.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    handler: async () => {
+      openReviewPopup();
+      return { ok: true };
+    }
+  },
+
+  // ---- NEW: Read current exercise (currentCharacter) ----
+  "trainer.getCurrentExercise": {
+    description: "Return the current exercise/character context (word, translation, pronunciation, counters, language, filters).",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    handler: async () => {
+      const c = currentCharacter || null;
+      return {
+        ok: true,
+        selectedLanguage,
+        selectedFont,
+        filters: {
+          level: levelFilterSelect?.value ?? "all",
+          tag: tagFilterSelect?.value ?? "all"
+        },
+        showModel: !!showModel,
+        current: c
+          ? {
+              number: c.number ?? null,
+              word: c.word ?? null,
+              pronunciation: c.pronunciation ?? null,
+              translation: c.translation ?? null,
+              level: c.level ?? null,
+              levels: c.levels ?? null,
+              tags: c.tags ?? null,
+              exercises: Number(c.exercises || 0),
+              failures: Number(c.failures || 0)
+            }
+          : null
+      };
+    }
+  },
+
+  // --- Get all characters (all languages) OR one language ----
+  "trainer.getCharacters": {
+    description: "Return the full character list. If language is provided, returns only that language list.",
+    parameters: {
+      type: "object",
+      properties: {
+        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] }
+      },
+      additionalProperties: false
+    },
+    handler: async ({ language } = {}) => {
+      if (!characterData) {
+        return { ok: false, error: "no_data", message: "characterData is not loaded yet." };
+      }
+      if (language) {
+        return { ok: true, language, characters: characterData[language] || [] };
+      }
+      return { ok: true, charactersByLanguage: characterData };
+    }
+  },
+
+  // ---- Download/export as JSON (triggers a file download in browser) ----
+  "trainer.downloadCharactersJson": {
+    description: "Download characters as a JSON file (all languages or one language).",
+    parameters: {
+      type: "object",
+      properties: {
+        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] },
+        filename: { type: "string" }
+      },
+      additionalProperties: false
+    },
+    handler: async ({ language, filename } = {}) => {
+      if (!characterData) throw new Error("characterData is not loaded yet.");
+
+      const payload = language ? (characterData[language] || []) : characterData;
+      const dataStr = JSON.stringify(payload, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || (language ? `${language}_characters.json` : "characters_all_languages.json");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      return { ok: true, downloaded: true, scope: language || "all" };
+    }
+  }
+};
+
+
+
+
