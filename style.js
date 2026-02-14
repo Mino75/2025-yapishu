@@ -14,6 +14,42 @@ style.innerHTML = `
   header {
     margin-top: 1rem;
   }
+
+  /* Eye toggle button (compact, top-right) */
+#eyeButton {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1100;
+  padding: 10px 12px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+/* Footer title */
+#footerTitle {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px;
+  background: rgba(26, 10, 42, 0.85);
+  backdrop-filter: blur(6px);
+  z-index: 900;
+}
+
+/* Ajuste le h1 dans le footer */
+#footerTitle h1 {
+  margin: 0;
+  font-size: 1rem;
+  color: #5de2f2;
+}
+
+/* evite que le footer masque des contrôles bas */
+body {
+  padding-bottom: 56px;
+}
+
   
   #logo {
     width: 100px; /* Adjust size as needed */
