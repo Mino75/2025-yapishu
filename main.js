@@ -96,8 +96,8 @@ eyeButton.addEventListener('click', () => setShowModel(!showModel));
 app.appendChild(eyeButton);
 
 function updateEyeButtonUI() {
-  // 👁️ = visible, 🙈 = masqué (ou remplace par ton icône préférée)
-  eyeButton.textContent = showModel ? '👁️' : '🙈';
+  // 👀 = visible, ㊙️ = masqué (ou remplace par ton icône préférée)
+  eyeButton.textContent = showModel ? '👀' : '㊙️';
 }
 updateEyeButtonUI();
 
