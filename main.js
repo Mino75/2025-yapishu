@@ -288,7 +288,7 @@ importButton.addEventListener('click', () => {
   fileInput.click();
 });
 
-// Skip button: immediately move to the next exercise without modifying scores
+// Skip button: immediately move and mark fail the current exercice
 skipButton.addEventListener('click', () => {
 if (currentCharacter) {
     currentCharacter.failures = Number(currentCharacter.failures || 0) + 1;
