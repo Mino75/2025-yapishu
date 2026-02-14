@@ -28,6 +28,19 @@ let lastX = 0, lastY = 0;
   footer.appendChild(h1);
 })();
 
+// SHow model
+let showModel = localStorage.getItem("showModel") !== "false"; // défaut = true
+
+function setShowModel(value) {
+  showModel = !!value;
+  localStorage.setItem("showModel", String(showModel));
+  updateEyeButtonUI();
+  // Re-render immédiat sur l’exercice en cours
+  if (currentCharacter) drawModelText();
+}
+
+
+
 // ----------------------------
 // CREATE SELECT ELEMENTS
 // ----------------------------
@@ -74,6 +87,21 @@ app.appendChild(tagFilterSelect);
 // ----------------------------
 // CREATE BUTTONS WITH EMOJI
 // ----------------------------
+
+const eyeButton = document.createElement('button');
+eyeButton.id = 'eyeButton';
+eyeButton.type = 'button';
+eyeButton.title = 'Afficher / masquer le modèle';
+eyeButton.addEventListener('click', () => setShowModel(!showModel));
+app.appendChild(eyeButton);
+
+function updateEyeButtonUI() {
+  // 👁️ = visible, 🙈 = masqué (ou remplace par ton icône préférée)
+  eyeButton.textContent = showModel ? '👁️' : '🙈';
+}
+updateEyeButtonUI();
+
+
 
 const skipButton = document.createElement('button');
 skipButton.textContent = '⏭️ Skip';
@@ -625,10 +653,16 @@ function getFittingFontSize(text, maxWidth, fontFamily) {
 
 // Draw the guide text (the current character) in the canvas
 function drawModelText() {
-  if (!currentCharacter) return; // safety
+  if (!currentCharacter) return;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Si le modèle est masqué, on s’arrête ici (canvas vide, prêt à écrire)
+  if (!showModel) return;
+
   const maxTextWidth = canvas.width * 0.8;
   const fontSize = getFittingFontSize(currentCharacter.word, maxTextWidth, selectedFont);
+
   ctx.save();
   ctx.globalAlpha = 0.2;
   ctx.fillStyle = 'black';
