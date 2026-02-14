@@ -948,10 +948,10 @@ class TTSPronunciation {
 const tts = new TTSPronunciation();
 
 // =============================
-// TRAINER TOOLS (Kizuna extension-style registry)
+// YAPISHU TOOLS (Kizuna extension-style registry)
 // =============================
 
-const TRAINER_TOOLS = {
+const YAPISHU_TOOLS = {
   "trainer.startTrainingExercise": {
     description: "Start/advance to the next training exercise using current filters and language.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
@@ -1171,6 +1171,9 @@ const TRAINER_TOOLS = {
     }
   }
 };
+
+window.kizuna_register_tools("trainer", YAPISHU_TOOLS);
+
 
 
 
