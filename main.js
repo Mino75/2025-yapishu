@@ -266,6 +266,14 @@ importButton.addEventListener('click', () => {
 
 // Skip button: immediately move to the next exercise without modifying scores
 skipButton.addEventListener('click', () => {
+if (currentCharacter) {
+    currentCharacter.failures = Number(currentCharacter.failures || 0) + 1;
+
+    // Persist the failure update
+    dbFunctions.updateCharacter(selectedLanguage, currentCharacter, characterData, () => {
+      // no-op
+    });
+  }  
   startTrainingExercise();
 });
 
@@ -600,57 +608,96 @@ function getProgressHTML(exCount) {
   return progressBar + emojis;
 }
 
-// Start a training exercise by selecting a character with the fewest exercises from the filtered list
+// ----------------------------
+// RG PARAMETERS (reconfigurable thresholds)
+// ----------------------------
+// Start a training exercise using probabilistic NEW/Known selection,
+// then pick the "worst" known items by max (failures - exercises).
+// ----------------------------
+// RG PARAMETERS (reconfigurable thresholds)
+// ----------------------------
+const P_NEW = 0.25; // 1/4 new, 3/4 known
+
 function startTrainingExercise() {
-  let fullList = characterData[selectedLanguage] || [];
-  
+  let fullList = characterData?.[selectedLanguage] || [];
+
   // Apply level filter
   const levelFilter = levelFilterSelect.value;
   if (levelFilter !== 'all') {
     fullList = fullList.filter(c => {
-      if (selectedLanguage === 'chinese_simplified') {
-        return c.level === levelFilter;
-      } else if (selectedLanguage === 'japanese' && c.tags) {
-        return c.tags.split(' ').some(tag => tag === levelFilter);
-      } else if (selectedLanguage === 'russian' && c.levels) {
-        return c.levels.split(', ').some(level => level.trim() === levelFilter);
-      }
+      if (selectedLanguage === 'chinese_simplified') return c.level === levelFilter;
+      if (selectedLanguage === 'japanese' && c.tags) return c.tags.split(' ').some(tag => tag === levelFilter);
+      if (selectedLanguage === 'russian' && c.levels) return c.levels.split(', ').some(level => level.trim() === levelFilter);
       return true;
     });
   }
-  
+
   // Apply tag filter
   const tagFilter = tagFilterSelect.value;
   if (tagFilter !== 'all') {
     fullList = fullList.filter(c => c.tags && c.tags.split(' ').includes(tagFilter));
   }
-  
+
   if (!fullList.length) {
-    translationDisplay.innerHTML = 'Aucun caractère ne correspond aux filtres sélectionnés.';
+    translationDisplay.innerHTML = 'No character matches the selected filters.';
     return;
   }
-  
-  const minExercises = Math.min(...fullList.map(c => c.exercises));
-  const candidates = fullList.filter(c => c.exercises === minExercises);
-  currentCharacter = candidates[Math.floor(Math.random() * candidates.length)];
-  
+
+  // Partition NEW and KNOWN
+  const NEW = [];
+  const KNOWN = [];
+  for (const c of fullList) {
+    const ex = Number(c.exercises || 0);
+    if (ex === 0) NEW.push(c);
+    else KNOWN.push(c);
+  }
+
+  // Step 1: Decide NEW vs KNOWN (fallback safe)
+  const takeNew = NEW.length > 0 && (Math.random() < P_NEW || KNOWN.length === 0);
+
+  if (takeNew) {
+    // Uniform random from NEW
+    currentCharacter = NEW[Math.floor(Math.random() * NEW.length)];
+  } else {
+    // Step 2: Choose among KNOWN with the highest deficit score (failures - exercises)
+    let maxScore = -Infinity;
+
+    for (const c of KNOWN) {
+      const ex = Number(c.exercises || 0);
+      const fa = Number(c.failures || 0);
+      const score = fa - ex;
+      if (score > maxScore) maxScore = score;
+    }
+
+    // Candidates are those with the same max score
+    const candidates = [];
+    for (const c of KNOWN) {
+      const ex = Number(c.exercises || 0);
+      const fa = Number(c.failures || 0);
+      const score = fa - ex;
+      if (score === maxScore) candidates.push(c);
+    }
+
+    currentCharacter = candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  // Render UI (unchanged)
   drawModelText();
-  
+
   let levelStr = '';
-  if (currentCharacter.level) {
-    levelStr = ` (${currentCharacter.level})`;
-  } else if (selectedLanguage === 'japanese' && currentCharacter.tags) {
+  if (currentCharacter.level) levelStr = ` (${currentCharacter.level})`;
+  else if (selectedLanguage === 'japanese' && currentCharacter.tags) {
     const jlptTag = currentCharacter.tags.split(' ').find(tag => tag.includes('JLPT'));
-    if (jlptTag) { levelStr = ` (${jlptTag})`; }
+    if (jlptTag) levelStr = ` (${jlptTag})`;
   } else if (selectedLanguage === 'russian' && currentCharacter.levels) {
     levelStr = ` (${currentCharacter.levels})`;
   }
 
   const isSupported = tts.isLanguageSupported(selectedLanguage);
-  const ttsButton = isSupported 
-    ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Écouter la prononciation">🔊</button>`
-    : `<span class="tts-button" style="cursor: not-allowed;" title="TTS non disponible">🔊</span>`;
-  
+  const ttsButton = isSupported
+    ? `<button class="tts-button" onclick="tts.speak('${currentCharacter.pronunciation}', '${selectedLanguage}')" title="Listen to pronunciation">🔊</button>`
+    : `<span class="tts-button" style="cursor: not-allowed;" title="TTS not available">🔊</span>`;
+
   translationDisplay.innerHTML = `
     Translation: ${currentCharacter.translation}${levelStr}<br>
     Pronunciation: ${currentCharacter.pronunciation || 'N/A'}${ttsButton}<br>
@@ -658,6 +705,7 @@ function startTrainingExercise() {
   `;
   finishButton.style.display = 'inline-block';
 }
+
 
 // Update filter dropdowns based on the available data for the selected language
 function updateFilters() {
