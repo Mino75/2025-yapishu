@@ -54,6 +54,7 @@ fonts.forEach(font => {
 });
 app.appendChild(fontSelect);
 
+
 // Level filter select
 const levelFilterSelect = document.createElement('select');
 levelFilterSelect.id = 'levelFilter';
@@ -75,30 +76,45 @@ app.appendChild(tagFilterSelect);
 // ----------------------------
 // CREATE BUTTONS WITH EMOJI
 // ----------------------------
-const clearDataButton = document.createElement('button');
-clearDataButton.textContent = '🗑️ Clear Data';
-clearDataButton.id = 'clearDataButton';
-app.appendChild(clearDataButton);
-
-const exportButton = document.createElement('button');
-exportButton.textContent = '📤 Export Score';
-exportButton.id = 'exportButton';
-app.appendChild(exportButton);
-
-const importButton = document.createElement('button');
-importButton.textContent = '📥 Import Score';
-importButton.id = 'importButton';
-app.appendChild(importButton);
 
 const skipButton = document.createElement('button');
 skipButton.textContent = '⏭️ Skip';
 skipButton.id = 'skipButton';
 app.appendChild(skipButton);
 
+// ----------------------------
+// Layout: push low-frequency controls below the canvas
+// ----------------------------
+const belowCanvas = document.createElement('div');
+belowCanvas.id = 'belowCanvas';
+belowCanvas.style.marginTop = '16px';
+
+// Insert the container right after the canvas container (preferred)
+const canvasContainer = document.getElementById('canvas-container');
+canvasContainer.insertAdjacentElement('afterend', belowCanvas);
+
+const exportButton = document.createElement('button');
+exportButton.textContent = '📤 Export Score';
+exportButton.id = 'exportButton';
+belowCanvas.appendChild(exportButton);
+
+const importButton = document.createElement('button');
+importButton.textContent = '📥 Import Score';
+importButton.id = 'importButton';
+belowCanvas.appendChild(importButton);
+
 const reviewButton = document.createElement('button');
 reviewButton.textContent = '📋 Review';
 reviewButton.id = 'reviewButton';
-app.appendChild(reviewButton);
+belowCanvas.appendChild(reviewButton);
+
+const clearDataButton = document.createElement('button');
+clearDataButton.textContent = '🗑️ Clear Data';
+clearDataButton.id = 'clearDataButton';
+belowCanvas.appendChild(clearDataButton);
+
+belowCanvas.appendChild(translationDisplay);
+
 
 // ----------------------------
 // GLOBAL VARIABLES
@@ -585,6 +601,7 @@ function getFittingFontSize(text, maxWidth, fontFamily) {
 
 // Draw the guide text (the current character) in the canvas
 function drawModelText() {
+  if (!currentCharacter) return; // safety
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const maxTextWidth = canvas.width * 0.8;
   const fontSize = getFittingFontSize(currentCharacter.word, maxTextWidth, selectedFont);
