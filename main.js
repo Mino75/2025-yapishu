@@ -786,45 +786,113 @@ function updateFilters() {
 }
 
 // ----------------------------
-// TTS FUNCTIONS
+// TTS FUNCTIONS (robust)
 // ----------------------------
-
 class TTSPronunciation {
   constructor() {
     this.synth = window.speechSynthesis;
     this.supportedLanguages = {
-      'japanese': ['ja', 'ja-JP'],
-      'chinese_simplified': ['zh', 'zh-CN'],
-      'russian': ['ru', 'ru-RU']
+      japanese: ['ja', 'ja-JP'],
+      chinese_simplified: ['zh', 'zh-CN'],
+      russian: ['ru', 'ru-RU'],
     };
+
+    this.voices = [];
+    this.voicesReady = false;
+
+    this._initVoices();
   }
-  
-  isLanguageSupported(language) {
-    if (!this.synth) return false;
-    const voices = this.synth.getVoices();
-    const langCodes = this.supportedLanguages[language] || [];
-    return voices.some(voice => 
-      langCodes.some(code => voice.lang.startsWith(code))
-    );
+
+  _initVoices() {
+    if (!this.synth) return;
+
+    const load = () => {
+      const list = this.synth.getVoices() || [];
+      if (list.length > 0) {
+        this.voices = list;
+        this.voicesReady = true;
+      }
+    };
+
+    // Try immediately (Chrome often has voices already)
+    load();
+
+    // Then listen for async load (Safari/iOS, some Chromium setups)
+    this.synth.onvoiceschanged = () => load();
   }
-  
-  speak(text, language) {
-    if (!this.isLanguageSupported(language)) return;
-    
-    const voices = this.synth.getVoices();
-    const langCodes = this.supportedLanguages[language];
-    const voice = voices.find(v => 
-      langCodes.some(code => v.lang.startsWith(code))
-    );
-    
-    if (voice) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.voice = voice;
-      utterance.rate = 0.8;
-      this.synth.speak(utterance);
+
+  async waitForVoices(timeoutMs = 2000) {
+    if (this.voicesReady) return true;
+
+    const start = Date.now();
+    return new Promise(resolve => {
+      const tick = () => {
+        if (this.voicesReady) return resolve(true);
+        if (Date.now() - start >= timeoutMs) return resolve(false);
+        setTimeout(tick, 50);
+      };
+      tick();
+    });
+  }
+
+  _pickVoice(languageKey) {
+    const langCodes = this.supportedLanguages[languageKey] || [];
+    if (!langCodes.length) return null;
+
+    const list = this.voices;
+
+    // 1) Exact match (best)
+    for (const code of langCodes) {
+      const v = list.find(v => v.lang && v.lang.toLowerCase() === code.toLowerCase());
+      if (v) return v;
     }
+
+    // 2) Prefix match (ru -> ru-RU)
+    for (const code of langCodes) {
+      const prefix = code.split('-')[0].toLowerCase();
+      const v = list.find(v => v.lang && v.lang.toLowerCase().startsWith(prefix));
+      if (v) return v;
+    }
+
+    return null;
+  }
+
+  async speak(text, languageKey) {
+    if (!this.synth) return;
+    if (!text) return;
+
+    // Ensure voices are available (critical on Safari/iOS)
+    await this.waitForVoices();
+
+    const voice = this._pickVoice(languageKey);
+    if (!voice) {
+      // If no matching voice exists, better to fail silently than pronounce with wrong locale
+      console.warn(`No matching voice for ${languageKey}. Install a voice for:`, this.supportedLanguages[languageKey]);
+      return;
+    }
+
+    // Cancel any ongoing speech to avoid queue stacking
+    this.synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Set BOTH voice and lang to avoid default-locale fallback
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+
+    utterance.rate = 0.8;
+
+    this.synth.speak(utterance);
+  }
+
+  isLanguageSupported(languageKey) {
+    const langCodes = this.supportedLanguages[languageKey] || [];
+    if (!this.voicesReady) return false;
+    return this.voices.some(v =>
+      langCodes.some(code => v.lang && v.lang.toLowerCase().startsWith(code.split('-')[0].toLowerCase()))
+    );
   }
 }
 
-// Instantiate TTS after global variables
+// Instantiate
 const tts = new TTSPronunciation();
