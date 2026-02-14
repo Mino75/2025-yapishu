@@ -126,6 +126,14 @@ let characterList = [];
 let currentCharacter = null; // Currently exercised character
 let drawing = false;
 
+////// HELPER RUSSIAN FILTER
+
+// Returns the primary (first) level from a Russian "levels" string like "A1, A2, B1"
+function getPrimaryRussianLevel(levelsStr) {
+  if (!levelsStr) return null;
+  return String(levelsStr).split(',')[0].trim();
+}
+
 // ----------------------------
 // USER SELECTION STORAGE HELPERS
 // ----------------------------
@@ -314,7 +322,7 @@ function openReviewPopup() {
       } else if (selectedLanguage === 'japanese' && c.tags) {
         return c.tags.split(' ').some(tag => tag === levelFilter);
       } else if (selectedLanguage === 'russian' && c.levels) {
-        return c.levels.split(', ').some(level => level.trim() === levelFilter);
+        return getPrimaryRussianLevel(c.levels) === levelFilter;
       }
       return true;
     });
@@ -644,7 +652,7 @@ function startTrainingExercise() {
     fullList = fullList.filter(c => {
       if (selectedLanguage === 'chinese_simplified') return c.level === levelFilter;
       if (selectedLanguage === 'japanese' && c.tags) return c.tags.split(' ').some(tag => tag === levelFilter);
-      if (selectedLanguage === 'russian' && c.levels) return c.levels.split(', ').some(level => level.trim() === levelFilter);
+      if (selectedLanguage === 'russian' && c.levels) return getPrimaryRussianLevel(c.levels) === levelFilter;;
       return true;
     });
   }
