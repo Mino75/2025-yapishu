@@ -320,27 +320,30 @@ window.styleHelpers = {
     return container;
   },
   
-  createCharacterItem: (character, selectedFont, onClick) => {
-    const item = document.createElement('div');
-    item.className = 'character-item';
-    
-    item.innerHTML = `
-      <div class="character-main-info">
-        <div class="character-word" style="font-family: ${selectedFont};">${character.word}</div>
-        <div class="character-translation">${character.translation}</div>
-      </div>
-      <div class="character-exercises-info">
-        <span class="character-exercises-badge">
-          ${character.exercises} exercises
-        </span>
-      </div>
-    `;
-    
-    item.addEventListener('click', () => onClick(character));
-    
-    return item;
-  },
-  
+createCharacterItem: (character, selectedFont, onClick) => {
+  const item = document.createElement('div');
+  item.className = 'character-item';
+
+  const ex = Number(character.exercises || 0);
+  const fa = Number(character.failures || 0);
+
+  item.innerHTML = `
+    <div class="character-main-info">
+      <div class="character-word" style="font-family: ${selectedFont};">${character.word}</div>
+      <div class="character-translation">${character.translation}</div>
+    </div>
+    <div class="character-exercises-info">
+      <span class="character-exercises-badge">
+        Ex: ${ex} | Fail: ${fa}
+      </span>
+    </div>
+  `;
+
+  item.addEventListener('click', () => onClick(character));
+
+  return item;
+},
+
   showNoCharactersMessage: (container) => {
     container.innerHTML = '<div class="no-characters-message">No characters found for the current filters.</div>';
   }
