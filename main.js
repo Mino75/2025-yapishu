@@ -14,6 +14,20 @@ const ctx = canvas.getContext('2d');
 // Coordinates for drawing
 let lastX = 0, lastY = 0;
 
+// Move title to bottom
+(function moveTitleToFooter() {
+  const h1 = document.querySelector('h1');
+  if (!h1) return;
+
+  let footer = document.getElementById('footerTitle');
+  if (!footer) {
+    footer = document.createElement('footer');
+    footer.id = 'footerTitle';
+    document.body.appendChild(footer);
+  }
+  footer.appendChild(h1);
+})();
+
 // ----------------------------
 // CREATE SELECT ELEMENTS
 // ----------------------------
@@ -36,23 +50,7 @@ const defaultFontForLanguage = {
   russian: 'Arial, sans-serif' 
 };
 
-// Font select
-const fontSelect = document.createElement('select');
-const fonts = [
-  { name: 'Sacramento', css: '"Sacramento", cursive' },
-  { name: 'Ma Shan Zheng', css: '"Ma Shan Zheng", cursive' },
-  { name: 'Yuji Mai', css: '"Yuji Mai", cursive' },
-  { name: 'Marck Script', css: '"Marck Script", cursive' },
-  { name: 'Noto Sans SC', css: '"Noto Sans SC", sans-serif' },
-  { name: 'Arial', css: 'Arial, sans-serif' }
-];
-fonts.forEach(font => {
-  const option = document.createElement('option');
-  option.value = font.css;
-  option.textContent = font.name;
-  fontSelect.appendChild(option);
-});
-app.appendChild(fontSelect);
+
 
 
 // Level filter select
@@ -114,6 +112,24 @@ clearDataButton.id = 'clearDataButton';
 belowCanvas.appendChild(clearDataButton);
 
 belowCanvas.appendChild(translationDisplay);
+
+// Font select
+const fontSelect = document.createElement('select');
+const fonts = [
+  { name: 'Sacramento', css: '"Sacramento", cursive' },
+  { name: 'Ma Shan Zheng', css: '"Ma Shan Zheng", cursive' },
+  { name: 'Yuji Mai', css: '"Yuji Mai", cursive' },
+  { name: 'Marck Script', css: '"Marck Script", cursive' },
+  { name: 'Noto Sans SC', css: '"Noto Sans SC", sans-serif' },
+  { name: 'Arial', css: 'Arial, sans-serif' }
+];
+fonts.forEach(font => {
+  const option = document.createElement('option');
+  option.value = font.css;
+  option.textContent = font.name;
+  fontSelect.appendChild(option);
+});
+belowCanvas.appendChild(fontSelect);
 
 
 // ----------------------------
