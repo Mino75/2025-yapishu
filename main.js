@@ -134,11 +134,6 @@ reviewButton.textContent = '📋 Review';
 reviewButton.id = 'reviewButton';
 belowCanvas.appendChild(reviewButton);
 
-const clearDataButton = document.createElement('button');
-clearDataButton.textContent = '🗑️ Clear Data';
-clearDataButton.id = 'clearDataButton';
-belowCanvas.appendChild(clearDataButton);
-
 belowCanvas.appendChild(translationDisplay);
 
 // Font select
@@ -241,44 +236,6 @@ levelFilterSelect.addEventListener('change', () => {
 tagFilterSelect.addEventListener('change', () => {
   saveUserSelection("selectedTag", tagFilterSelect.value);
   startTrainingExercise();
-});
-
-// Clear Data: confirm, then clear IndexedDB and caches with auto-reload
-clearDataButton.addEventListener('click', () => {
-  if (confirm("Are you sure you want to clear data? This will remove the IndexedDB data and cache, then reload the page.")) {
-    if (db) {
-      try {
-        db.close();
-      } catch (e) {
-        console.warn('Error closing DB:', e);
-      }
-      db = null;
-    }
-    const req = indexedDB.deleteDatabase("characterDB");
-    req.onsuccess = () => {
-      console.log("IndexedDB deleted successfully.");
-      
-      //  Clear additional browser storage:
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      if ('caches' in window) {
-        caches.keys().then(names => {
-          names.forEach(name => caches.delete(name));
-        }).then(() => {
-          // Auto-reload the page after clearing caches
-          window.location.reload();
-        });
-      } else {
-        // Auto-reload even if caches API is not available
-        window.location.reload();
-      }
-    };
-    req.onerror = () => {
-      console.error("Error deleting IndexedDB.");
-      alert("Error occurred while clearing data. Please try again.");
-    };
-  }
 });
 
 // Export Score: download current characterData as JSON
@@ -952,23 +909,23 @@ const tts = new TTSPronunciation();
 // =============================
 
 const YAPISHU_TOOLS = {
-  "trainer.startTrainingExercise": {
+  startTrainingExercise: {
     description: "Start/advance to the next training exercise using current filters and language.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     handler: async () => {
+      if (!characterData) return { ok: false, error: "no_data" };
       startTrainingExercise();
       return { ok: true };
     }
   },
 
-  "trainer.skip": {
+  skip: {
     description: "Skip the current exercise (counts as failure) and moves to the next one.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     handler: async () => {
-      // Prefer calling the same UX path to keep behavior identical
+      if (!characterData) return { ok: false, error: "no_data" };
       if (typeof skipButton?.click === "function") skipButton.click();
       else {
-        // Fallback: replicate skip handler
         if (currentCharacter) {
           currentCharacter.failures = Number(currentCharacter.failures || 0) + 1;
           dbFunctions.updateCharacter(selectedLanguage, currentCharacter, characterData, () => {});
@@ -979,10 +936,11 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.finish": {
+  finish: {
     description: "Mark the current exercise as finished (increments exercises) and moves to the next one.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     handler: async () => {
+      if (!characterData) return { ok: false, error: "no_data" };
       if (typeof finishButton?.click === "function") finishButton.click();
       else {
         if (currentCharacter) {
@@ -998,13 +956,11 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.setLanguage": {
+  setLanguage: {
     description: "Set the training language (japanese, chinese_simplified, russian) and restart exercise.",
     parameters: {
       type: "object",
-      properties: {
-        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] }
-      },
+      properties: { language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] } },
       required: ["language"],
       additionalProperties: false
     },
@@ -1015,13 +971,11 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.setFont": {
+  setFont: {
     description: "Set the current font (CSS font-family value) and redraw model text when applicable.",
     parameters: {
       type: "object",
-      properties: {
-        fontCss: { type: "string" }
-      },
+      properties: { fontCss: { type: "string" } },
       required: ["fontCss"],
       additionalProperties: false
     },
@@ -1032,7 +986,7 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.setLevelFilter": {
+  setLevelFilter: {
     description: "Set the level filter value and restart exercise.",
     parameters: {
       type: "object",
@@ -1047,7 +1001,7 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.setTagFilter": {
+  setTagFilter: {
     description: "Set the tag filter value and restart exercise.",
     parameters: {
       type: "object",
@@ -1062,13 +1016,11 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.toggleModel": {
+  toggleModel: {
     description: "Show/hide the model (guide text) on the canvas.",
     parameters: {
       type: "object",
-      properties: {
-        show: { type: "boolean", description: "true=show model, false=hide model" }
-      },
+      properties: { show: { type: "boolean" } },
       required: ["show"],
       additionalProperties: false
     },
@@ -1078,18 +1030,18 @@ const YAPISHU_TOOLS = {
     }
   },
 
-  "trainer.openReview": {
+  openReview: {
     description: "Open the review popup for the current language and filters.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     handler: async () => {
+      if (!characterData) return { ok: false, error: "no_data" };
       openReviewPopup();
       return { ok: true };
     }
   },
 
-  // ---- NEW: Read current exercise (currentCharacter) ----
-  "trainer.getCurrentExercise": {
-    description: "Return the current exercise/character context (word, translation, pronunciation, counters, language, filters).",
+  getCurrentExercise: {
+    description: "Return the current exercise/character context.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
     handler: async () => {
       const c = currentCharacter || null;
@@ -1102,77 +1054,47 @@ const YAPISHU_TOOLS = {
           tag: tagFilterSelect?.value ?? "all"
         },
         showModel: !!showModel,
-        current: c
-          ? {
-              number: c.number ?? null,
-              word: c.word ?? null,
-              pronunciation: c.pronunciation ?? null,
-              translation: c.translation ?? null,
-              level: c.level ?? null,
-              levels: c.levels ?? null,
-              tags: c.tags ?? null,
-              exercises: Number(c.exercises || 0),
-              failures: Number(c.failures || 0)
-            }
-          : null
+        current: c ? {
+          number: c.number ?? null,
+          word: c.word ?? null,
+          pronunciation: c.pronunciation ?? null,
+          translation: c.translation ?? null,
+          level: c.level ?? null,
+          levels: c.levels ?? null,
+          tags: c.tags ?? null,
+          exercises: Number(c.exercises || 0),
+          failures: Number(c.failures || 0)
+        } : null
       };
     }
   },
 
-  // --- Get all characters (all languages) OR one language ----
-  "trainer.getCharacters": {
+  getCharacters: {
     description: "Return the full character list. If language is provided, returns only that language list.",
     parameters: {
       type: "object",
-      properties: {
-        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] }
-      },
+      properties: { language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] } },
       additionalProperties: false
     },
     handler: async ({ language } = {}) => {
-      if (!characterData) {
-        return { ok: false, error: "no_data", message: "characterData is not loaded yet." };
-      }
-      if (language) {
-        return { ok: true, language, characters: characterData[language] || [] };
-      }
-      return { ok: true, charactersByLanguage: characterData };
-    }
-  },
-
-  // ---- Download/export as JSON (triggers a file download in browser) ----
-  "trainer.downloadCharactersJson": {
-    description: "Download characters as a JSON file (all languages or one language).",
-    parameters: {
-      type: "object",
-      properties: {
-        language: { type: "string", enum: ["japanese", "chinese_simplified", "russian"] },
-        filename: { type: "string" }
-      },
-      additionalProperties: false
-    },
-    handler: async ({ language, filename } = {}) => {
-      if (!characterData) throw new Error("characterData is not loaded yet.");
-
-      const payload = language ? (characterData[language] || []) : characterData;
-      const dataStr = JSON.stringify(payload, null, 2);
-      const blob = new Blob([dataStr], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename || (language ? `${language}_characters.json` : "characters_all_languages.json");
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      return { ok: true, downloaded: true, scope: language || "all" };
+      if (!characterData) return { ok: false, error: "no_data" };
+      return language
+        ? { ok: true, language, characters: characterData[language] || [] }
+        : { ok: true, charactersByLanguage: characterData };
     }
   }
 };
 
-window.kizuna_register_tools("trainer", YAPISHU_TOOLS);
+// register tools
+
+(function registerWhenReady(){
+  if (typeof window.kizuna_register_tools === "function") {
+    window.kizuna_register_tools("yapishu", YAPISHU_TOOLS);
+  } else {
+    setTimeout(registerWhenReady, 50);
+  }
+})();
+
 
 
 
