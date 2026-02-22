@@ -1,6 +1,6 @@
 # 🖌️ Yapishu (я пишу) - Character Calligraphy PWA
 
-> A Progressive Web App for practicing character writing in Japanese, Chinese, and Russian
+> я пишу (I write in Russian) is a Progressive Web App for practicing character writing in Japanese, Chinese, and Russian
 
 ## ✨ Features
 
