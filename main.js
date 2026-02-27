@@ -1,5 +1,32 @@
 // main.js
 
+(function intentBootstrap() {
+  try {
+    const url = new URL(window.location.href);
+    const hp = new URLSearchParams((url.hash || "").replace(/^#/, ""));
+    const qp = url.searchParams;
+
+    const intent = hp.get("intent") || qp.get("intent");
+    if (!intent) return;
+
+    const text = hp.get("text") || qp.get("text"); // ex: 尽可能
+    const language = hp.get("language") || qp.get("language"); // ex: chinese_simplified
+
+    localStorage.setItem("__yapishu_intent__", JSON.stringify({
+      intent,
+      text,
+      language,
+      ts: Date.now()
+    }));
+
+    
+    ["intent","text","language"].forEach(k => qp.delete(k));
+    url.hash = "";
+    history.replaceState({}, "", url.toString());
+  } catch {}
+})();
+
+
 // ----------------------------
 // DOM ELEMENT REFERENCES
 // ----------------------------
@@ -35,7 +62,7 @@ function setShowModel(value) {
   showModel = !!value;
   localStorage.setItem("showModel", String(showModel));
   updateEyeButtonUI();
-  // Re-render immédiat sur l’exercice en cours
+  // Re-render 
   if (currentCharacter) drawModelText();
 }
 
@@ -215,6 +242,8 @@ fontSelect.addEventListener('change', () => {
   }
 });
 
+let __suppressAutoStart = false;
+
 // Language select: update selected language, apply default font, update filters, and restart exercise
 languageSelect.addEventListener('change', () => {
   selectedLanguage = languageSelect.value;
@@ -225,7 +254,7 @@ languageSelect.addEventListener('change', () => {
     saveUserSelection("selectedFont", selectedFont);
   }
   updateFilters();
-  startTrainingExercise();
+  if (!__suppressAutoStart) startTrainingExercise();
 });
 
 // Filter selects: update training exercise on change and save user selections
@@ -500,14 +529,83 @@ function clearAndReloadData() {
 // ----------------------------
 // TRAINING FUNCTIONALITY
 // ----------------------------
+function normWord(s) {
+  return String(s ?? "")
+    .normalize("NFC")
+    .trim();
+}
+//find character
+function findCharacterByWord(language, word) {
+  const target = normWord(word);
+  const list = characterData?.[language] || [];
+  return list.find(c => normWord(c.word) === target) || null;
+}
 
+// apply startup intent
+
+async function applyStartupIntentIfAny() {
+  const raw = localStorage.getItem("__yapishu_intent__");
+  if (!raw) return;
+
+  let p;
+  try { p = JSON.parse(raw); } catch { return; }
+  if (!characterData) return;
+
+  try {
+    // 1) startTrainingExercise()
+    if (p.language && ["japanese","chinese_simplified","russian"].includes(p.language)) {
+      __suppressAutoStart = true;
+      try {
+        languageSelect.value = p.language;
+        languageSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      } finally {
+        __suppressAutoStart = false;
+      }
+    }
+
+    // 2)  spécific
+    if (p.intent === "exercise" && p.text) {
+      const lang = p.language || selectedLanguage;
+
+      let target = findCharacterByWord(lang, p.text);
+
+      // Fallback: + switch
+      if (!target) {
+        const langs = ["japanese","chinese_simplified","russian"];
+        for (const L of langs) {
+          target = findCharacterByWord(L, p.text);
+          if (target) {
+            __suppressAutoStart = true;
+            try {
+              languageSelect.value = L;
+              languageSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            } finally {
+              __suppressAutoStart = false;
+            }
+            break;
+          }
+        }
+      }
+
+      if (target) loadSpecificCharacter(target);
+      else translationDisplay.innerHTML = `Not found: <b>${p.text}</b>`;
+    }
+  } finally {
+    localStorage.removeItem("__yapishu_intent__");
+  }
+}
 // Called after data is loaded; restores selections, updates filters, and starts training
 function finishLoading() {
   loadingOverlay.style.display = 'none';
   loadUserSelections();
   updateFilters();
   setupTraining();
-  startTrainingExercise();
+
+  if (localStorage.getItem("__yapishu_intent__")) {
+    applyStartupIntentIfAny();
+  } else {
+    startTrainingExercise();
+  }
 }
 
 // Set up training events and drawing functionality
@@ -614,7 +712,7 @@ function drawModelText() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Si le modèle est masqué, on s’arrête ici (canvas vide, prêt à écrire)
+  // (canvas 
   if (!showModel) return;
 
   const maxTextWidth = canvas.width * 0.8;
@@ -1088,11 +1186,19 @@ const YAPISHU_TOOLS = {
 // register tools
 
 (function registerWhenReady(){
-  if (typeof window.kizuna_register_tools === "function") {
-    window.kizuna_register_tools("yapishu", YAPISHU_TOOLS);
-  } else {
-    setTimeout(registerWhenReady, 50);
-  }
+  const start = Date.now();
+  const MAX_WAIT = 3000;
+
+  const tick = () => {
+    if (typeof window.kizuna_register_tools === "function") {
+      window.kizuna_register_tools("yapishu", YAPISHU_TOOLS);
+      return;
+    }
+    if (Date.now() - start > MAX_WAIT) return;
+    setTimeout(tick, 50);
+  };
+
+  tick();
 })();
 
 
