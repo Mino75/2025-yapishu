@@ -339,10 +339,38 @@ reviewButton.addEventListener('click', () => {
 // ----------------------------
 // REVIEW POPUP FUNCTIONS
 // ----------------------------
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")                 // décompose les accents
+    .replace(/[\u0300-\u036f]/g, "")  // supprime les diacritiques
+    .toLocaleLowerCase()
+    .trim();
+}
+
+function characterMatchesSearch(character, query) {
+  const q = normalizeSearchText(query);
+  if (!q) return true;
+
+  const haystacks = [
+    character.word,
+    character.translation,
+    character.pronunciation,
+    character.tags,
+    character.level,
+    character.levels
+  ]
+    .filter(Boolean)
+    .map(normalizeSearchText);
+
+  return haystacks.some(text => text.includes(q));
+}
+
+
 // Updated openReviewPopup function that uses CSS classes from style.js
 function openReviewPopup() {
   let fullList = characterData[selectedLanguage] || [];
-  
+
   // Apply current level filter
   const levelFilter = levelFilterSelect.value;
   if (levelFilter !== 'all') {
@@ -361,15 +389,15 @@ function openReviewPopup() {
   // Sort by training value (descending) then alphabetically
   fullList.sort((a, b) => {
     if (b.exercises !== a.exercises) {
-      return b.exercises - a.exercises; // Higher training values first
+      return b.exercises - a.exercises;
     }
-    return a.word.localeCompare(b.word); // Then alphabetically
+    return a.word.localeCompare(b.word);
   });
 
   // Create popup modal using helper functions
   const modal = window.styleHelpers.createPopupModal();
   const popup = window.styleHelpers.createPopupContent();
-  
+
   // Create and add header
   const title = `Review Characters - ${selectedLanguage.replace('_', ' ')} ${levelFilter !== 'all' ? `(${levelFilter})` : ''}`;
   const header = window.styleHelpers.createPopupHeader(title, () => {
@@ -377,18 +405,43 @@ function openReviewPopup() {
   });
   popup.appendChild(header);
 
+  // Search input
+  const searchInput = document.createElement('input');
+  searchInput.type = 'search';
+  searchInput.placeholder = 'Filtrer par caractère, mot, traduction, prononciation...';
+  searchInput.autocomplete = 'off';
+  searchInput.spellcheck = false;
+  searchInput.style.width = '100%';
+  searchInput.style.boxSizing = 'border-box';
+  searchInput.style.margin = '0 0 12px 0';
+  searchInput.style.padding = '10px 12px';
+  searchInput.style.fontSize = '16px';
+  popup.appendChild(searchInput);
+
   // Create character list container
   const listContainer = window.styleHelpers.createCharacterListContainer();
-  
-  if (fullList.length === 0) {
-    window.styleHelpers.showNoCharactersMessage(listContainer);
-  } else {
-    fullList.forEach(character => {
+  popup.appendChild(listContainer);
+
+  function renderList(query = '') {
+    listContainer.innerHTML = '';
+
+    const filteredList = fullList.filter(character => characterMatchesSearch(character, query));
+
+    if (filteredList.length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = query
+        ? 'No character matches this search.'
+        : 'No characters available.';
+      empty.style.padding = '12px';
+      listContainer.appendChild(empty);
+      return;
+    }
+
+    filteredList.forEach(character => {
       const item = window.styleHelpers.createCharacterItem(
-        character, 
-        selectedFont, 
+        character,
+        selectedFont,
         (character) => {
-          // Close popup and load training for this character
           document.body.removeChild(modal);
           loadSpecificCharacter(character);
         }
@@ -397,9 +450,17 @@ function openReviewPopup() {
     });
   }
 
-  popup.appendChild(listContainer);
+  renderList('');
+
+  searchInput.addEventListener('input', () => {
+    renderList(searchInput.value);
+  });
+
   modal.appendChild(popup);
   document.body.appendChild(modal);
+
+  // Focus search directly for fast UX
+  setTimeout(() => searchInput.focus(), 0);
 
   // Close popup when clicking outside
   modal.addEventListener('click', (e) => {
